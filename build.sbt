@@ -40,15 +40,31 @@ lazy val kernel = sonatypeProject(id = "cakeless", base = file("./kernel"))
   .settings(libraryDependencies ++= {
     val testV      = "3.0.4"
     val shapelessV = "2.3.3"
+    val catsV      = "1.5.0"
     Seq(
-      "com.chuusai"   %% "shapeless" % shapelessV withSources (),
-      "org.scalactic" %% "scalactic" % testV withSources (),
-      "org.scalatest" %% "scalatest" % testV % "test" withSources ()
+      "com.chuusai"     %% "shapeless"     % shapelessV withSources (),
+      "org.typelevel"   %% "cats-core"     % catsV withSources (),
+      "org.scalamacros" %% "resetallattrs" % "1.0.0" withSources (),
+      "org.scalactic"   %% "scalactic"     % testV withSources (),
+      "org.scalatest"   %% "scalatest"     % testV % "test" withSources ()
     )
   })
 
+lazy val examples = project
+  .in(file("./examples"))
+  .dependsOn(kernel)
+  .settings(
+    name := "examples",
+    version := v,
+    scalaVersion := `scala-2-12`,
+    crossScalaVersions := Seq(`scala-2-11`, `scala-2-12`),
+    scalacOptions += "-Ypartial-unification",
+    addCompilerPlugin("org.spire-math" %% "kind-projector" % "0.9.8")
+  )
+
 lazy val root = project
   .in(file("."))
+  .dependsOn(examples)
   .aggregate(kernel)
   .settings(
     name := "cakeless",
