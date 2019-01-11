@@ -42,11 +42,10 @@ lazy val kernel = sonatypeProject(id = "cakeless", base = file("./kernel"))
     val shapelessV = "2.3.3"
     val catsV      = "1.5.0"
     Seq(
-      "com.chuusai"     %% "shapeless"     % shapelessV withSources (),
-      "org.typelevel"   %% "cats-core"     % catsV withSources (),
-      "org.scalamacros" %% "resetallattrs" % "1.0.0" withSources (),
-      "org.scalactic"   %% "scalactic"     % testV withSources (),
-      "org.scalatest"   %% "scalatest"     % testV % "test" withSources ()
+      "com.chuusai"   %% "shapeless" % shapelessV withSources (),
+      "org.typelevel" %% "cats-core" % catsV withSources (),
+      "org.scalactic" %% "scalactic" % testV withSources (),
+      "org.scalatest" %% "scalatest" % testV % "test" withSources ()
     )
   })
 

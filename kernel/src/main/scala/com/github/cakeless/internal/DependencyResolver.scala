@@ -1,7 +1,5 @@
 package com.github.cakeless.internal
 
-import com.github.cakeless.Cake
-
 import scala.language.higherKinds
 import scala.language.experimental.macros
 import shapeless._
@@ -15,18 +13,49 @@ class DependencyResolver(val c: whitebox.Context) {
   def assertMacro(cond: Boolean, msg: String): Unit =
     if (!cond) c.abort(c.enclosingPosition, msg)
 
-  def resolveDependencies[A: WeakTypeTag]: Tree = {
+  def buildHListType[A: WeakTypeTag](returnTypes: List[Type]): Tree = {
     def buildHList(head: Type, remaining: List[Type]): Tree = remaining match {
       case Nil                  => tq"shapeless.::[$head, $hnil]"
       case scala.::(dep, rest0) => tq"shapeless.::[$head, ${buildHList(dep, rest0)}]"
     }
 
-    val A = weakTypeOf[A]
+    val scala.::(first, rest) = returnTypes.map(_.resultType.dealias)
+    buildHList(first, rest)
+  }
 
-    val abstractValues = A.members
+  def instantiate[A: WeakTypeTag](
+      abstractValues: List[MethodSymbol],
+      depsValueName: TermName,
+      depsType: Tree
+  ): Tree = {
+    val A = weakTypeOf[A].dealias
+
+    val assignments = abstractValues.zipWithIndex.map {
+      case (method, idx) =>
+        c.untypecheck(q"override lazy val ${method.name} = $depsValueName($idx)")
+    }
+
+//    println(assignments.mkString("\n"))
+    val clsName = TypeName(c.freshName(s"cakeless_${A.typeSymbol.name.toString}"))
+
+    q"""
+       new com.github.cakeless.Cake[$A] {
+         type Dependencies = $depsType
+         class $clsName() extends ${A.typeSymbol.asClass.selfType} { ..$assignments }
+         def bake($depsValueName: $depsType): $A = new $clsName() {}
+       }
+     """
+  }
+
+  def makeCake[A: WeakTypeTag]: Tree = {
+    val A = weakTypeOf[A].dealias
+
+    val abstractValues = A.typeSymbol.asClass.selfType.members
       .filter(s => s.isMethod && s.isAbstract)
       .map(_.asMethod)
       .filter(_.paramLists.isEmpty)
+      .toList
+      .reverse
 
     assertMacro(
       abstractValues.nonEmpty,
@@ -35,22 +64,10 @@ class DependencyResolver(val c: whitebox.Context) {
 
     val returnTypes = abstractValues.map(_.returnType)
 
-    val scala.::(first, rest) = returnTypes.map(_.resultType.dealias).toList.reverse
-    buildHList(first, rest)
-  }
+    val deps = buildHListType[A](returnTypes)
 
-  def makeCake[A: WeakTypeTag]: Tree = {
-    val A    = weakTypeOf[A].dealias
-    val deps = resolveDependencies[A]
-
-//    println(s"Deps for $A: $deps")
-    val expr = q"""
-       new com.github.cakeless.Cake[$A] {
-         type Dependencies = $deps
-         def bake(deps: Dependencies): $A = null
-       }
-     """
-//    println(expr)
+    val expr = instantiate[A](abstractValues, TermName("deps"), deps)
+    println(expr)
     expr
   }
 }
