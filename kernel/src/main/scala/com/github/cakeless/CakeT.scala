@@ -4,10 +4,14 @@ import cats.{~>, FlatMap, Functor}
 import cats.data.ReaderT
 import com.github.cakeless.internal.UnUnion
 import shapeless.{Generic, HList, Nat}
-import shapeless.ops.hlist.{Prepend, Split, Union}
-
+import shapeless.ops.hlist.Union
+import scala.annotation.implicitNotFound
 import scala.language.higherKinds
 
+@implicitNotFound("""
+    Unable to find CakeT for ${A} in context ${F}.
+    Please ensure that you haven't messed up with self-typing rules
+  """)
 trait CakeT[F[_], A] extends Serializable { self =>
   type Dependencies <: HList
 

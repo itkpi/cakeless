@@ -58,7 +58,11 @@ lazy val examples = project
     scalaVersion := `scala-2-12`,
     crossScalaVersions := Seq(`scala-2-11`, `scala-2-12`),
     scalacOptions += "-Ypartial-unification",
-    addCompilerPlugin("org.spire-math" %% "kind-projector" % "0.9.8")
+    addCompilerPlugin("org.spire-math" %% "kind-projector" % "0.9.8"),
+    libraryDependencies ++= Seq(
+      "com.typesafe"  % "config"       % "1.3.3",
+      "org.typelevel" %% "cats-effect" % "1.1.0"
+    )
   )
 
 lazy val root = project

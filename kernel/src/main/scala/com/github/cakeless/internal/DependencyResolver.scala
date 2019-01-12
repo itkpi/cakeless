@@ -10,10 +10,15 @@ class DependencyResolver(val c: whitebox.Context) {
 
   private val hnil = typeOf[HNil].dealias
 
-  def assertMacro(cond: Boolean, msg: String): Unit =
+  private val debug = sys.env.getOrElse("cakeless_macro_debug", "false").toBoolean
+
+  private def assertMacro(cond: Boolean, msg: String): Unit =
     if (!cond) c.abort(c.enclosingPosition, msg)
 
-  def buildHListType[A: WeakTypeTag](returnTypes: List[Type]): Tree = {
+  private def ifDebug[U](thunk: => U): Unit =
+    if (debug) thunk
+
+  private def buildHListType[A: WeakTypeTag](returnTypes: List[Type]): Tree = {
     def buildHList(head: Type, remaining: List[Type]): Tree = remaining match {
       case Nil                  => tq"shapeless.::[$head, $hnil]"
       case scala.::(dep, rest0) => tq"shapeless.::[$head, ${buildHList(dep, rest0)}]"
@@ -35,16 +40,20 @@ class DependencyResolver(val c: whitebox.Context) {
         c.untypecheck(q"override lazy val ${method.name} = $depsValueName($idx)")
     }
 
-//    println(assignments.mkString("\n"))
-    val clsName = TypeName(c.freshName(s"cakeless_${A.typeSymbol.name.toString}"))
+    ifDebug {
+      println("Assignments" + assignments.mkString("\n"))
+    }
+
+    def extractClassesChain(tpe: Type): List[Type] = tpe match {
+      case RefinedType(types, _) => types.flatMap(extractClassesChain)
+      case _                     => tpe :: Nil
+    }
 
     q"""
        new com.github.cakeless.Cake[$A] {
          type Dependencies = $depsType
-         class $clsName() extends ${A.typeSymbol.asClass.selfType} { ..$assignments }
-         def bake($depsValueName: $depsType): $A = new $clsName() {}
-       }
-     """
+         def bake($depsValueName: $depsType): $A = new ..${extractClassesChain(A)} { ..$assignments }
+       }"""
   }
 
   def makeCake[A: WeakTypeTag]: Tree = {
@@ -67,7 +76,11 @@ class DependencyResolver(val c: whitebox.Context) {
     val deps = buildHListType[A](returnTypes)
 
     val expr = instantiate[A](abstractValues, TermName("deps"), deps)
-    println(expr)
+
+    ifDebug {
+      println(expr)
+    }
+
     expr
   }
 }
