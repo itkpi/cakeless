@@ -1,4 +1,4 @@
-package com.github.cakeless.internal
+package cakeless.internal
 
 import scala.language.higherKinds
 import scala.language.experimental.macros
@@ -50,7 +50,7 @@ class DependencyResolver(val c: whitebox.Context) {
     }
 
     q"""
-       new com.github.cakeless.Cake[$A] {
+       new cakeless.Cake[$A] {
          type Dependencies = $depsType
          def bake($depsValueName: $depsType): $A = new ..${extractClassesChain(A)} { ..$assignments }
        }"""

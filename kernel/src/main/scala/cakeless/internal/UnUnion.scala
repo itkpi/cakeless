@@ -1,4 +1,4 @@
-package com.github.cakeless.internal
+package cakeless.internal
 
 import shapeless._
 import shapeless.ops.hlist._

@@ -5,8 +5,8 @@ import cats.syntax.all._
 import cats.effect.{ExitCode, IO, IOApp}
 import java.nio.file.{Path, Paths}
 import scala.concurrent.{ExecutionContext, Future}
-import com.github.cakeless._
 import com.typesafe.config.{Config, ConfigFactory}
+import cakeless._
 
 trait ExecutionContextComponent {
   implicit def ec: ExecutionContext

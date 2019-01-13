@@ -1,10 +1,10 @@
-package com.github.cakeless
+package cakeless
 
-import cats.{~>, FlatMap, Functor}
+import cakeless.internal.UnUnion
 import cats.data.ReaderT
-import com.github.cakeless.internal.UnUnion
-import shapeless.{Generic, HList, Nat}
+import cats.{~>, FlatMap, Functor}
 import shapeless.ops.hlist.Union
+import shapeless.{Generic, HList, Nat}
 import scala.annotation.implicitNotFound
 import scala.language.higherKinds
 

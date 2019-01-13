@@ -1,9 +1,7 @@
-package com.github
-
-import cats.Id
-import com.github.cakeless.internal.DependencyResolver
 import scala.language.experimental.macros
 import scala.language.higherKinds
+import cats.Id
+import cakeless.internal.DependencyResolver
 
 package object cakeless {
   type Cake[A] = CakeT[Id, A]
