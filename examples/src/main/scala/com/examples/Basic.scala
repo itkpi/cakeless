@@ -8,39 +8,7 @@ import java.nio.file.{Path, Paths}
 import scala.concurrent.{ExecutionContext, Future}
 import com.typesafe.config.{Config, ConfigFactory}
 import cakeless._
-import cakeless.cats.effect._
-
-trait ExecutionContextComponent {
-  implicit def ec: ExecutionContext
-}
-
-trait FileConfigComponent {
-  def configPath: Path
-}
-
-trait PropsComponent {
-  def props: Map[String, String]
-}
-
-case class Wiring(ec: ExecutionContext, configPath: Path, props: Map[String, String])
-
-trait AllComponents1 { self: ExecutionContextComponent with FileConfigComponent =>
-  def getConfigFileAsync: Future[Config] = Future {
-    ConfigFactory.parseFile(configPath.toFile)
-  }
-}
-
-trait AllComponents2 { self: ExecutionContextComponent with PropsComponent =>
-  def getPropAsync(prop: String): Future[Option[String]] = Future {
-    props get prop
-  }
-}
-
-trait NestedComponent { self: AllComponents2 with ExecutionContextComponent with PropsComponent =>
-  def getConfigAsync(config: Config)(key: String): Future[Option[String]] = Future {
-    scala.util.Try(config getString key).toOption
-  }
-}
+import cakeless.cats_effect._
 
 object Basic extends IOApp {
 

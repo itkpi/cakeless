@@ -1,11 +1,9 @@
-package cakeless.cats.effect
+package cakeless.cats_effect
 
 import cakeless.CakeT
 import cakeless.CakeT.Aux
 import cats.Applicative
 import cats.effect.ExitCase
-import shapeless.{::, HNil}
-
 import scala.language.higherKinds
 
 /**

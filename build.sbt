@@ -33,7 +33,8 @@ def sonatypeProject(id: String, base: File) =
           Some("releases" at nexus + "service/local/staging/deploy/maven2")
       },
       scalacOptions ++= Seq("-Ypartial-unification", "-feature"),
-      resolvers += Resolver.sonatypeRepo("releases")
+      resolvers += Resolver.sonatypeRepo("releases"),
+      addCompilerPlugin("org.spire-math" %% "kind-projector" % "0.9.8")
     )
 
 lazy val kernel = sonatypeProject(id = "cakeless", base = file("./kernel"))
@@ -45,8 +46,7 @@ lazy val kernel = sonatypeProject(id = "cakeless", base = file("./kernel"))
         Testing.scalactic,
         Testing.scalatest
       )
-    },
-    addCompilerPlugin("org.spire-math" %% "kind-projector" % "0.9.8")
+    }
   )
 
 lazy val `cats-effect` = sonatypeProject(id = "cakeless-cats-effect", base = file("./cats-effect"))
@@ -56,13 +56,15 @@ lazy val `cats-effect` = sonatypeProject(id = "cakeless-cats-effect", base = fil
       Seq(
         Cats.effect
       )
-    },
-    addCompilerPlugin("org.spire-math" %% "kind-projector" % "0.9.8")
+    }
   )
+
+lazy val lifecycle = sonatypeProject(id = "cakeless-lifecycle", base = file("./lifecycle"))
+  .dependsOn(kernel)
 
 lazy val examples = project
   .in(file("./examples"))
-  .dependsOn(kernel, `cats-effect`)
+  .dependsOn(kernel, `cats-effect`, lifecycle)
   .settings(
     name := "examples",
     version := v,
@@ -79,7 +81,7 @@ lazy val examples = project
 lazy val root = project
   .in(file("."))
   .dependsOn(examples)
-  .aggregate(kernel, `cats-effect`)
+  .aggregate(kernel, `cats-effect`, lifecycle)
   .settings(
     name := "cakeless",
     version := v,
