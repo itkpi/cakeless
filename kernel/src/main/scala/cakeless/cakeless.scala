@@ -1,9 +1,9 @@
 import scala.language.experimental.macros
 import scala.language.higherKinds
-import cats.Id
+import cats.{~>, Applicative, Id}
 import cakeless.internal.DependencyResolver
 
-package object cakeless {
+package object cakeless extends LowPriorityCakes {
   type Cake[A] = CakeT[Id, A]
   object Cake {
     type Aux[A, D0] = Cake[A] { type Dependencies = D0 }

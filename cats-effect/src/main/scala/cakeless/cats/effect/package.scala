@@ -2,13 +2,12 @@ package cakeless.cats
 
 import cakeless._
 import _root_.cats.effect._
+import _root_.cats.{~>, Id}
+import scala.language.higherKinds
 
 package object effect {
-  implicit def cakeIntoSync[F[_], A](implicit cake: Cake[A], F: Sync[F]): CakeT.Aux[F, A, cake.Dependencies] =
-    new CakeT[F, A] {
-      type Dependencies = cake.Dependencies
-      def bake(deps: cake.Dependencies): F[A] = F.delay {
-        cake bake deps
-      }
-    }
+  implicit class SyncOps[A, D0](private val self: Cake.Aux[A, D0]) extends AnyVal {
+    def delayed[F[_]](implicit F: Sync[F]): CakeT.Aux[F, A, D0] =
+      self.mapK[F](λ[Id[?] ~> F[?]](F.delay(_)))
+  }
 }

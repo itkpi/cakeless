@@ -46,10 +46,24 @@ object Basic extends IOApp {
 
   def run(args: List[String]): IO[ExitCode] = {
     val program = for {
-      comp1 <- cakeT[IO, AllComponents1 with ExecutionContextComponent with FileConfigComponent].logged(List("Creating Components 1..."))
-      comp2 <- cakeT[IO, AllComponents2 with ExecutionContextComponent with PropsComponent].logged(List("Creating Components 2..."))
-      comp3 <- cakeT[IO, NestedComponent with AllComponents2 with ExecutionContextComponent with FileConfigComponent with PropsComponent]
-        .logged(List("Creating Nested component..."))
+      comp1 <- {
+        cake[AllComponents1 with ExecutionContextComponent with FileConfigComponent]
+          .delayed[IO]
+          .logged(List("Creating Components 1..."))
+      }
+
+      comp2 <- {
+        cake[AllComponents2 with ExecutionContextComponent with PropsComponent]
+          .delayed[IO]
+          .logged(List("Creating Components 2..."))
+      }
+
+      comp3 <- {
+        cake[NestedComponent with AllComponents2 with ExecutionContextComponent with FileConfigComponent with PropsComponent]
+          .delayed[IO]
+          .logged(List("Creating Nested component..."))
+      }
+
     } yield {
       import comp1.ec
       IO.fromFuture(IO {
