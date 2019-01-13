@@ -1,4 +1,5 @@
 import xerial.sbt.Sonatype._
+import Dependencies._
 
 lazy val snapshot: Boolean = true
 lazy val v: String = {
@@ -37,21 +38,30 @@ def sonatypeProject(id: String, base: File) =
     )
 
 lazy val kernel = sonatypeProject(id = "cakeless", base = file("./kernel"))
-  .settings(libraryDependencies ++= {
-    val testV      = "3.0.4"
-    val shapelessV = "2.3.3"
-    val catsV      = "1.5.0"
-    Seq(
-      "com.chuusai"   %% "shapeless" % shapelessV withSources (),
-      "org.typelevel" %% "cats-core" % catsV withSources (),
-      "org.scalactic" %% "scalactic" % testV withSources (),
-      "org.scalatest" %% "scalatest" % testV % "test" withSources ()
-    )
-  })
+  .settings(
+    libraryDependencies ++= {
+      Seq(
+        Shapeless.value,
+        Cats.core,
+        Testing.scalactic,
+        Testing.scalatest
+      )
+    }
+  )
+
+lazy val `cats-effect` = sonatypeProject(id = "cakeless-cats-effect", base = file("./cats-effect"))
+  .dependsOn(kernel)
+  .settings(
+    libraryDependencies ++= {
+      Seq(
+        Cats.effect
+      )
+    }
+  )
 
 lazy val examples = project
   .in(file("./examples"))
-  .dependsOn(kernel)
+  .dependsOn(kernel, `cats-effect`)
   .settings(
     name := "examples",
     version := v,
@@ -60,15 +70,14 @@ lazy val examples = project
     scalacOptions += "-Ypartial-unification",
     addCompilerPlugin("org.spire-math" %% "kind-projector" % "0.9.8"),
     libraryDependencies ++= Seq(
-      "com.typesafe"  % "config"       % "1.3.3",
-      "org.typelevel" %% "cats-effect" % "1.1.0"
+      Config.typesafe
     )
   )
 
 lazy val root = project
   .in(file("."))
   .dependsOn(examples)
-  .aggregate(kernel)
+  .aggregate(kernel, `cats-effect`)
   .settings(
     name := "cakeless",
     version := v,

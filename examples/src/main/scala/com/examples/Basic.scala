@@ -1,12 +1,14 @@
 package com.examples
 
 import cats._
-import cats.syntax.all._
+import cats.implicits._
+import cats.data.WriterT
 import cats.effect.{ExitCode, IO, IOApp}
 import java.nio.file.{Path, Paths}
 import scala.concurrent.{ExecutionContext, Future}
 import com.typesafe.config.{Config, ConfigFactory}
 import cakeless._
+import cakeless.cats.effect._
 
 trait ExecutionContextComponent {
   implicit def ec: ExecutionContext
@@ -44,9 +46,10 @@ object Basic extends IOApp {
 
   def run(args: List[String]): IO[ExitCode] = {
     val program = for {
-      comp1 <- cake[AllComponents1 with ExecutionContextComponent with FileConfigComponent]
-      comp2 <- cake[AllComponents2 with ExecutionContextComponent with PropsComponent]
-      comp3 <- cake[NestedComponent with AllComponents2 with ExecutionContextComponent with FileConfigComponent with PropsComponent]
+      comp1 <- cakeT[IO, AllComponents1 with ExecutionContextComponent with FileConfigComponent].logged(List("Creating Components 1..."))
+      comp2 <- cakeT[IO, AllComponents2 with ExecutionContextComponent with PropsComponent].logged(List("Creating Components 2..."))
+      comp3 <- cakeT[IO, NestedComponent with AllComponents2 with ExecutionContextComponent with FileConfigComponent with PropsComponent]
+        .logged(List("Creating Nested component..."))
     } yield {
       import comp1.ec
       IO.fromFuture(IO {
@@ -58,13 +61,22 @@ object Basic extends IOApp {
       })
     }
 
-    val resultIO = program bake Wiring(
-      ec = ExecutionContext.global,
-      configPath = Paths.get("examples/src/main/resources/application.conf"),
-      props = Map("foo.bar" -> "hostname")
-    )
+    val result: WriterT[IO, List[String], IO[Option[String]]] =
+      program bake Wiring(
+        ec = ExecutionContext.global,
+        configPath = Paths.get("examples/src/main/resources/application.conf"),
+        props = Map("foo.bar" -> "hostname")
+      ) tell List("Created cake!")
 
-    resultIO.map(println).as(ExitCode.Success)
+    result.run
+      .flatMap {
+        case (log, value) =>
+          value.map { value =>
+            log.foreach(println)
+            println(s"Result: $value")
+          }
+      }
+      .as(ExitCode.Success)
   }
 
 }
