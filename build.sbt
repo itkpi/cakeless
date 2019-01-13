@@ -34,7 +34,11 @@ def sonatypeProject(id: String, base: File) =
       },
       scalacOptions ++= Seq("-Ypartial-unification", "-feature"),
       resolvers += Resolver.sonatypeRepo("releases"),
-      addCompilerPlugin("org.spire-math" %% "kind-projector" % "0.9.8")
+      addCompilerPlugin("org.spire-math" %% "kind-projector" % "0.9.8"),
+      libraryDependencies ++= Seq(
+        Testing.scalactic,
+        Testing.scalatest
+      )
     )
 
 lazy val kernel = sonatypeProject(id = "cakeless", base = file("./kernel"))
@@ -42,9 +46,7 @@ lazy val kernel = sonatypeProject(id = "cakeless", base = file("./kernel"))
     libraryDependencies ++= {
       Seq(
         Shapeless.value,
-        Cats.core,
-        Testing.scalactic,
-        Testing.scalatest
+        Cats.core
       )
     }
   )
@@ -61,6 +63,13 @@ lazy val `cats-effect` = sonatypeProject(id = "cakeless-cats-effect", base = fil
 
 lazy val lifecycle = sonatypeProject(id = "cakeless-lifecycle", base = file("./lifecycle"))
   .dependsOn(kernel)
+  .settings(
+    libraryDependencies ++= {
+      Seq(
+        Testing.mockito
+      )
+    }
+  )
 
 lazy val examples = project
   .in(file("./examples"))

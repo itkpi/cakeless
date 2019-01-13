@@ -1,7 +1,9 @@
 package cakeless
 
 import cats.Applicative
+
 import scala.language.higherKinds
+import scala.util.control.NonFatal
 
 package object lifecycle {
   implicit class LifecycleOps[F[_], A, D0](private val self: CakeT.Aux[F, A, D0]) {
@@ -34,5 +36,8 @@ package object lifecycle {
 
     def recover(f: PartialFunction[Throwable, A])(implicit F: Applicative[F], L: Lifecycle[F]): CakeT.Aux[F, A, D0] =
       L.recover(self)(f)
+
+    def recoverNonFatal(thunk: => A)(implicit F: Applicative[F], L: Lifecycle[F]): CakeT.Aux[F, A, D0] =
+      L.recover(self) { case NonFatal(_) => thunk }
   }
 }
