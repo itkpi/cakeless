@@ -1,8 +1,11 @@
 package cakeless
 
 import cakeless._
+import cats.effect.concurrent.Ref
 import cats.effect.{Bracket => _, _}
-import cats.{~>, Applicative, Id}
+import cats.{Applicative, Id, ~>}
+import shapeless.HList
+
 import scala.language.higherKinds
 
 package object cats_effect {
@@ -29,5 +32,22 @@ package object cats_effect {
 
     def guaranteeCase[E](finalizer: ExitCase[E] => F[Unit])(implicit F: Applicative[F], B: Bracket[F, E]): CakeT.Aux[F, A, D0] =
       B.guaranteeCase(self)(finalizer)
+  }
+
+  implicit class SingletonOps[F[_], A, D0 <: HList](private val self: CakeT.Aux[F, A, D0]) extends AnyVal {
+    def singleton(implicit F: Sync[F]): CakeT.Aux[F, A, D0] = new CakeT[F, A] {
+      type Dependencies = D0
+
+      private val ref = Ref.unsafe[F, Option[A]](None)
+
+      def bake(deps: Dependencies): F[A] = F.flatMap(ref.get) {
+        case None =>
+          val fa = self bake deps
+          F.flatMap(fa) { a =>
+            F.as(ref.set(Some(a)), a)
+          }
+        case Some(a) => F.pure(a)
+      }
+    }
   }
 }

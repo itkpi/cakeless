@@ -1,7 +1,6 @@
 package com.examples
 
 import java.nio.file.Paths
-
 import cakeless._
 import cakeless.lifecycle._
 import cakeless.cats_effect._
@@ -24,6 +23,7 @@ object LifecycleExample extends IOApp {
 
     val comp2 = cake[AllComponents2 with ExecutionContextComponent with PropsComponent with DbComponent]
       .delayed[IO]
+      .singleton // ensures that component will be created exactly once
       .postStartUseF { comp =>
         println("Opening connection with DB...")
         comp.db.openConnection().recoverWith {
