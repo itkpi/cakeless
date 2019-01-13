@@ -1,3 +1,12 @@
+---
+Project: Cakeless
+Current version: -
+Scala version: 2.11.12, 2.12.8
+---
+
+[![codecov](https://codecov.io/gh/itkpi/cakeless/branch/master/graph/badge.svg)](https://codecov.io/gh/itkpi/cakeless)
+[![Build Status](https://travis-ci.com/itkpi/cakeless.svg?branch=master)](https://travis-ci.com/itkpi/cakeless)
+
 # cakeless
 
 Cakeless is library providing better reader monad for well-known cake pattern.
