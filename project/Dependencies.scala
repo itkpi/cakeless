@@ -6,6 +6,7 @@ object Dependencies {
   val catsV           = "1.5.0"
   val catsEffectV     = "1.1.0"
   val typesafeConfigV = "1.3.3"
+  val mockitoV        = "2.23.4"
 
   object Shapeless {
     val value = "com.chuusai" %% "shapeless" % shapelessV withSources ()
@@ -17,8 +18,9 @@ object Dependencies {
   }
 
   object Testing {
-    val scalatest = "org.scalatest" %% "scalatest" % testV % "test" withSources ()
-    val scalactic = "org.scalactic" %% "scalactic" % testV withSources ()
+    val scalatest = "org.scalatest" %% "scalatest"   % testV % "test" withSources ()
+    val scalactic = "org.scalactic" %% "scalactic"   % testV withSources ()
+    val mockito   = "org.mockito"   % "mockito-core" % mockitoV % "test" withSources ()
   }
 
   object Config {
