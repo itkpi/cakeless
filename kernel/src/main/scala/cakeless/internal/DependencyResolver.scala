@@ -4,8 +4,9 @@ import scala.language.higherKinds
 import scala.language.experimental.macros
 import shapeless._
 import scala.reflect.macros.whitebox
+import japgolly.microlibs.macro_utils.MacroUtils
 
-class DependencyResolver(val c: whitebox.Context) {
+class DependencyResolver(val c: whitebox.Context) extends MacroUtils {
   import c.universe._
 
   private val hnil = typeOf[HNil].dealias
@@ -18,7 +19,7 @@ class DependencyResolver(val c: whitebox.Context) {
   private def ifDebug[U](thunk: => U): Unit =
     if (debug) thunk
 
-  private def buildHListType[A: WeakTypeTag](returnTypes: List[Type]): Tree = {
+  private def buildHListType(returnTypes: List[Type]): Tree = {
     def buildHList(head: Type, remaining: List[Type]): Tree = remaining match {
       case Nil                  => tq"shapeless.::[$head, $hnil]"
       case scala.::(dep, rest0) => tq"shapeless.::[$head, ${buildHList(dep, rest0)}]"
@@ -28,31 +29,55 @@ class DependencyResolver(val c: whitebox.Context) {
     buildHList(first, rest)
   }
 
-  def instantiate[A: WeakTypeTag](
+  private def extractClassesChain(tpe: Type): List[Type] = tpe match {
+    case RefinedType(types, _) => types.flatMap(extractClassesChain)
+    case _                     => tpe :: Nil
+  }
+
+  private def instantiate[A: WeakTypeTag](
+      mainType: Type,
+      constructorParams: List[Type],
       abstractValues: List[MethodSymbol],
       depsValueName: TermName,
       depsType: Tree
   ): Tree = {
     val A = weakTypeOf[A].dealias
 
-    val assignments = abstractValues.zipWithIndex.map {
-      case (method, idx) =>
-        c.untypecheck(q"override lazy val ${method.name} = $depsValueName($idx)")
+    val typeRefinements = extractClassesChain(A).filterNot(_ =:= mainType)
+
+    ifDebug {
+      println("Self-types:\n\t" + typeRefinements.mkString("\n\t"))
+      println(sep)
+    }
+
+    val passConstructorParams = constructorParams.indices.map { idx =>
+      c.untypecheck(q"$depsValueName($idx)")
     }
 
     ifDebug {
-      println("Assignments" + assignments.mkString("\n"))
+      println(
+        "Constructor params:\n\t" + passConstructorParams.mkString("\n\t")
+      )
+      println(sep)
     }
 
-    def extractClassesChain(tpe: Type): List[Type] = tpe match {
-      case RefinedType(types, _) => types.flatMap(extractClassesChain)
-      case _                     => tpe :: Nil
+    val assignments = {
+      val offset = constructorParams.size
+      abstractValues.zipWithIndex.map {
+        case (method, idx) =>
+          c.untypecheck(q"override lazy val ${method.name} = $depsValueName(${offset + idx})")
+      }
+    }
+
+    ifDebug {
+      println("Assignments:\n\t" + assignments.mkString("\n\t"))
+      println(sep)
     }
 
     q"""
        new cakeless.Cake[$A] {
          type Dependencies = $depsType
-         def bake($depsValueName: $depsType): $A = new ..${extractClassesChain(A)} { ..$assignments }
+         def bake($depsValueName: $depsType): $A = new $mainType(..$passConstructorParams) with ..$typeRefinements { ..$assignments }
        }"""
   }
 
@@ -71,14 +96,41 @@ class DependencyResolver(val c: whitebox.Context) {
       s"There is no sense in cakeless for $A because it doesn't have parameter-less abstract val's or def's"
     )
 
-    val returnTypes = abstractValues.map(_.returnType)
+    val abstractMembersReturnTypes = abstractValues.map(_.returnType)
 
-    val deps = buildHListType[A](returnTypes)
-
-    val expr = instantiate[A](abstractValues, TermName("deps"), deps)
+    val mainType = A match {
+      case RefinedType(types, _) => types.head
+      case _                     => A
+    }
 
     ifDebug {
-      println(expr)
+      println(s"Main type: $mainType")
+      println(sep)
+    }
+
+    val constructorParams = {
+      if (mainType.decls.exists(s => s.isMethod && s.asMethod.isPrimaryConstructor)) primaryConstructorParams(mainType)
+      else Nil
+    }
+
+    ifDebug {
+      println(s"Primary constructor params: $constructorParams")
+      println(sep)
+    }
+    val deps = buildHListType(constructorParams.map(_.typeSignature.dealias) ++ abstractMembersReturnTypes)
+
+    val expr = instantiate[A](
+      mainType,
+      constructorParams.map(_.typeSignature.dealias),
+      abstractValues,
+      TermName("deps"),
+      deps
+    )
+
+    ifDebug {
+      println(sep)
+      println("Generated code:\n" + expr)
+      println(sep)
     }
 
     expr

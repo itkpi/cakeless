@@ -21,7 +21,7 @@ trait PropsComponent {
   def props: Map[String, String]
 }
 
-case class Wiring(ec: ExecutionContext, configPath: Path, props: Map[String, String])
+case class Wiring(ec: ExecutionContext, configPath: Path, props: Map[String, String], token: String)
 
 case class WiringWithDb(ec: ExecutionContext, configPath: Path, props: Map[String, String], db: Database[IO])
 
@@ -37,7 +37,7 @@ trait AllComponents2 { self: ExecutionContextComponent with PropsComponent =>
   }
 }
 
-trait NestedComponent { self: AllComponents2 with ExecutionContextComponent with PropsComponent =>
+class NestedComponent(val token: String) { self: AllComponents2 with ExecutionContextComponent with PropsComponent =>
   def getConfigAsync(config: Config)(key: String): Future[Option[String]] = Future {
     scala.util.Try(config getString key).toOption
   }

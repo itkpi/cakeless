@@ -7,6 +7,7 @@ object Dependencies {
   val catsEffectV     = "1.1.0"
   val typesafeConfigV = "1.3.3"
   val mockitoV        = "2.23.4"
+  val macroUtilV      = "1.18"
 
   object Shapeless {
     val value = "com.chuusai" %% "shapeless" % shapelessV withSources ()
@@ -25,5 +26,9 @@ object Dependencies {
 
   object Config {
     val typesafe = "com.typesafe" % "config" % typesafeConfigV withSources ()
+  }
+
+  object Macros {
+    val utils = "com.github.japgolly.microlibs" %% "macro-utils" % macroUtilV withSources ()
   }
 }

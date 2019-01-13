@@ -39,7 +39,7 @@ object Basic extends IOApp {
           config <- comp1.getConfigFileAsync
           key    <- comp2.getPropAsync("foo.bar")
           value  <- comp3.getConfigAsync(config)(key getOrElse "")
-        } yield value
+        } yield value.map(_ + s"/${comp3.token}")
       })
     }
 
@@ -47,7 +47,8 @@ object Basic extends IOApp {
       program bake Wiring(
         ec = ExecutionContext.global,
         configPath = Paths.get("examples/src/main/resources/application.conf"),
-        props = Map("foo.bar" -> "hostname")
+        props = Map("foo.bar" -> "hostname"),
+        token = "1232asd"
       ) tell List("Created cake!")
 
     result.run

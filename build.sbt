@@ -46,7 +46,8 @@ lazy val kernel = sonatypeProject(id = "cakeless", base = file("./kernel"))
     libraryDependencies ++= {
       Seq(
         Shapeless.value,
-        Cats.core
+        Cats.core,
+        Macros.utils
       )
     }
   )
