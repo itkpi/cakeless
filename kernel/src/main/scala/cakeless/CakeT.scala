@@ -53,6 +53,8 @@ trait CakeT[F[_], A] extends Serializable { self =>
 
   def toReader: ReaderT[F, Dependencies, A] = ReaderT[F, Dependencies, A](bake)
 
+  def toReader[R](implicit gen: Generic.Aux[R, Dependencies]): ReaderT[F, R, A] = ReaderT[F, R, A](bake[R](_))
+
   def logged[L: Monoid](logRecord: L)(implicit F: Applicative[F]): CakeT.Aux[WriterT[F, L, ?], A, Dependencies] = new CakeT[WriterT[F, L, ?], A] {
     type Dependencies = self.Dependencies
     def bake(deps: Dependencies): WriterT[F, L, A] = WriterT.liftF(self bake deps).tell(logRecord)

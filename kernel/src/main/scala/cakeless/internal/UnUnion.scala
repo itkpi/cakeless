@@ -22,6 +22,8 @@ trait UnUnion[A <: HList, B <: HList, C <: HList] {
 }
 
 object UnUnion {
+  def apply[A <: HList, B <: HList, C <: HList](implicit ev: UnUnion[A, B, C]): UnUnion[A, B, C] = ev
+
   implicit def hlistUnUnion[M <: HList]: UnUnion[HNil, M, M] = new UnUnion[HNil, M, M] {
     def apply(c: M): (HNil, M) = (HNil, c)
   }
