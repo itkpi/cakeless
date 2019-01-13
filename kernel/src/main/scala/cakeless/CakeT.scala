@@ -3,7 +3,7 @@ package cakeless
 import cakeless.internal.UnUnion
 import cats.data.{ReaderT, WriterT}
 import cats.kernel.Monoid
-import cats.{Applicative, FlatMap, Functor, ~>}
+import cats.{~>, Applicative, FlatMap, Functor, Monad}
 import shapeless.ops.hlist.Union
 import shapeless.{Generic, HList, Nat}
 
@@ -27,6 +27,13 @@ trait CakeT[F[_], A] extends Serializable { self =>
       type Dependencies = self.Dependencies
 
       def bake(deps: self.Dependencies): F[B] = F.map(self bake deps)(f)
+    }
+
+  def mapM[B](f: A => F[B])(implicit F: Monad[F]): CakeT.Aux[F, B, Dependencies] =
+    new CakeT[F, B] {
+      type Dependencies = self.Dependencies
+
+      def bake(deps: Dependencies): F[B] = F.flatMap(self bake deps)(f)
     }
 
   def flatMap[B, D2 <: HList, Out <: HList, AL <: Nat](
@@ -55,10 +62,11 @@ trait CakeT[F[_], A] extends Serializable { self =>
 
   def toReader[R](implicit gen: Generic.Aux[R, Dependencies]): ReaderT[F, R, A] = ReaderT[F, R, A](bake[R](_))
 
-  def logged[L: Monoid](logRecord: L)(implicit F: Applicative[F]): CakeT.Aux[WriterT[F, L, ?], A, Dependencies] = new CakeT[WriterT[F, L, ?], A] {
-    type Dependencies = self.Dependencies
-    def bake(deps: Dependencies): WriterT[F, L, A] = WriterT.liftF(self bake deps).tell(logRecord)
-  }
+  def logged[L: Monoid](logRecord: L)(implicit F: Applicative[F]): CakeT.Aux[WriterT[F, L, ?], A, Dependencies] =
+    new CakeT[WriterT[F, L, ?], A] {
+      type Dependencies = self.Dependencies
+      def bake(deps: Dependencies): WriterT[F, L, A] = WriterT.liftF(self bake deps).tell(logRecord)
+    }
 }
 
 object CakeT {
