@@ -1,16 +1,32 @@
 ---
 Project: Cakeless
-Current version: 0.1
+Current version: 0.1-SNAPSHOT
 Scala version: 2.11.12, 2.12.8
 ---
 
 [![codecov](https://codecov.io/gh/itkpi/cakeless/branch/master/graph/badge.svg)](https://codecov.io/gh/itkpi/cakeless)
 [![Build Status](https://travis-ci.com/itkpi/cakeless.svg?branch=master)](https://travis-ci.com/itkpi/cakeless)
 
+![Cats Friendly Badge](https://typelevel.org/cats/img/cats-badge-tiny.png) 
+
 # cakeless
 
 Cakeless is library providing better reader monad for well-known cake pattern.
 It's implemented using cats and shapeless.
+
+To try it, add the following into your `build.sbt` file:
+```scala
+resolvers += "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"
+
+libraryDependencies ++= {
+  val cakelessV = "0.1-SNAPSHOT"
+  Seq(
+    "ua.pp.itkpi" %% "cakeless" % cakelessV,
+    "ua.pp.itkpi" %% "cakeless-cats-effect" % cakelessV,
+    "ua.pp.itkpi" %% "cakeless-lifecycle" % cakelessV
+  )
+}
+```
 
 Assume you have such components:
 ```scala
