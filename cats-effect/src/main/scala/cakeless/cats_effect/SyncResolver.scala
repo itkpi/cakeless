@@ -1,12 +1,18 @@
 package cakeless.cats_effect
 
 import cakeless.internal.DependencyResolver
-import cats.effect.concurrent.Ref
-
 import scala.reflect.macros.whitebox
 import scala.language.experimental.macros
 import scala.language.higherKinds
 
+/**
+  * Whitebox-macro magic
+  * picking up cake dependencies on the type level
+  * and generating wiring code (like macwire does).
+  *
+  * Additionally wraps component allocation into monadic context
+  * for which [[cats.effect.Sync]] is defined.
+  * */
 class SyncResolver(override val c: whitebox.Context) extends DependencyResolver(c) {
   import c.universe._
 

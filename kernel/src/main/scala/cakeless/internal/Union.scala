@@ -3,6 +3,11 @@ package cakeless.internal
 import shapeless.{DepFn2, Generic, HList}
 import shapeless.ops.hlist.{Union => SUnion}
 
+/**
+  * More generic version of [[shapeless.ops.hlist.Union]]
+  * allowing to merge arbitrary types
+  * (for instance case classes).
+  * */
 trait Union[A, B] extends DepFn2[A, B] with Serializable
 object Union {
   type Aux[A, B, Out0] = Union[A, B] { type Out = Out0 }

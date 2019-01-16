@@ -6,6 +6,11 @@ import shapeless._
 import scala.reflect.macros.whitebox
 import japgolly.microlibs.macro_utils.MacroUtils
 
+/**
+  * Whitebox-macro magic
+  * picking up cake dependencies on the type level
+  * and generating wiring code (like macwire does).
+  * */
 class DependencyResolver(val c: whitebox.Context) extends MacroUtils {
 
   import c.universe._
