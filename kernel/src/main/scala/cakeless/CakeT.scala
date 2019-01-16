@@ -440,4 +440,36 @@ object CakeT {
 
     def bake(deps: D0): F[D0] = F.pure(deps)
   }
+
+  /**
+    * Allows to lift pure function into Cake.
+    *
+    * Useful when [[A]] component is not a cake.
+    *
+    * @tparam F - monadic context
+    * @tparam A - component type
+    * @tparam D0 - dependency type
+    * @param f - allocation function
+    * @param F - applicative functor for [[F]] context
+    * @return  - cake for which `bake` === `f`
+    * */
+  def ap[F[_], A, D0](f: D0 => A)(implicit F: Applicative[F]): CakeT.Aux[F, A, D0] =
+    apF[F, A, D0](d => F.pure(f(d)))
+
+  /**
+    * Allows to lift monadic function into Cake.
+    *
+    * Useful when [[A]] component is not a cake.
+    *
+    * @tparam F - monadic context
+    * @tparam A - component type
+    * @tparam D0 - dependency type
+    * @param f - monadic allocation function
+    * @return  - cake for which `bake`  `f`
+    * */
+  def apF[F[_], A, D0](f: D0 => F[A]): CakeT.Aux[F, A, D0] = new CakeT[F, A] {
+    type Dependencies = D0
+
+    def bake(deps: D0): F[A] = f(deps)
+  }
 }

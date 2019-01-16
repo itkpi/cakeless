@@ -345,4 +345,40 @@ class KernelSpec extends FlatSpec {
 
     assert(result == "1 :: HNil --> foo")
   }
+
+  class NotCake(a: Int, b: String) {
+    def test: String = s"$a + $b"
+  }
+
+  "CakeT.apF" should "work correctly" in {
+    val c0 = CakeT.apF[Try, NotCake, Int :: String :: HNil] {
+      case a :: b :: HNil =>
+        Try(new NotCake(a, b))
+    }
+
+    val result = c0.bake(1 :: "foo" :: HNil)
+    assert(result.isSuccess)
+    assert(result.get.test == "1 + foo")
+  }
+
+  "CakeT.ap" should "work correctly" in {
+    val c0 = CakeT.ap[Try, NotCake, Int :: String :: HNil] {
+      case a :: b :: HNil =>
+        new NotCake(a, b)
+    }
+
+    val result = c0.bake(1 :: "foo" :: HNil)
+    assert(result.isSuccess)
+    assert(result.get.test == "1 + foo")
+  }
+
+  "Cake.ap" should "work correctly" in {
+    val c0 = Cake.ap[NotCake, Int :: String :: HNil] {
+      case a :: b :: HNil =>
+        new NotCake(a, b)
+    }
+
+    val result = c0.bake(1 :: "foo" :: HNil)
+    assert(result.test == "1 + foo")
+  }
 }
