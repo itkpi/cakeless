@@ -5,8 +5,7 @@ import cakeless.lifecycle.Lifecycle
 import cats.data.{ReaderT, WriterT}
 import cats.kernel.Monoid
 import cats.{~>, Applicative, FlatMap, Functor, Monad}
-import shapeless.{Generic, HList, HNil, Nat}
-
+import shapeless.{Generic, HNil, Nat}
 import scala.annotation.implicitNotFound
 import scala.language.higherKinds
 import scala.util.control.NonFatal
@@ -25,6 +24,9 @@ trait CakeT[F[_], A] extends Serializable { self =>
   def as[R](implicit gen: Generic.Aux[R, Dependencies], F: Functor[F]): CakeT.Aux[F, A, R] =
     comap[R](gen.to)
 
+  def asR[R](implicit gen: Generic[R]): widenAsDsl[R, gen.Repr] =
+    new widenAsDsl[R, gen.Repr](gen)
+
   def comap[D2](f: D2 => Dependencies): CakeT.Aux[F, A, D2] =
     new CakeT[F, A] {
       type Dependencies = D2
@@ -39,6 +41,13 @@ trait CakeT[F[_], A] extends Serializable { self =>
       def bake(deps: self.Dependencies): F[B] = F.map(self bake deps)(f)
     }
 
+  def depMap[B](f: (Dependencies, A) => B)(implicit F: Functor[F]): CakeT.Aux[F, B, Dependencies] =
+    new CakeT[F, B] {
+      type Dependencies = self.Dependencies
+
+      def bake(deps: self.Dependencies): F[B] = F.map(self bake deps)(f(deps, _))
+    }
+
   def flatMap[B, D1, Out, AL <: Nat](
       f: A => CakeT.Aux[F, B, D1]
   )(implicit union: Union.Aux[self.Dependencies, D1, Out],
@@ -51,6 +60,22 @@ trait CakeT[F[_], A] extends Serializable { self =>
         val (deps0, deps1) = unUnion(deps)
         F.flatMap(self bake deps0) { a =>
           f(a) bake deps1
+        }
+      }
+    }
+
+  def depFlatMap[B, D1, Out, AL <: Nat](
+      f: (Dependencies, A) => CakeT.Aux[F, B, D1]
+  )(implicit union: Union.Aux[self.Dependencies, D1, Out],
+    unUnion: UnUnion[self.Dependencies, D1, Out],
+    F: FlatMap[F]): CakeT.Aux[F, B, Out] =
+    new CakeT[F, B] {
+      type Dependencies = Out
+
+      def bake(deps: Dependencies): F[B] = {
+        val (deps0, deps1) = unUnion(deps)
+        F.flatMap(self bake deps0) { a =>
+          f(deps0, a) bake deps1
         }
       }
     }
@@ -111,6 +136,13 @@ trait CakeT[F[_], A] extends Serializable { self =>
 
   def recoverNonFatal(thunk: => A)(implicit F: Applicative[F], L: Lifecycle[F]): CakeT.Aux[F, A, self.Dependencies] =
     L.recover(self) { case NonFatal(_) => thunk }
+
+  // INTERNAL
+
+  class widenAsDsl[T, Repr](val `gen`: Generic.Aux[T, Repr]) {
+    def widen(implicit ev: Repr <:< Dependencies): CakeT.Aux[F, A, T] =
+      comap[T](r => ev(`gen`.to(r)))
+  }
 }
 
 object CakeT {

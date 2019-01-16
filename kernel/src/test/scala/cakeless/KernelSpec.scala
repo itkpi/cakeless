@@ -4,13 +4,17 @@ import cats._
 import cats.implicits._
 import cats.data.WriterT
 import org.scalatest.FlatSpec
-import shapeless.{::, HNil}
+import shapeless.{::, HNil, Witness}
 import cakeless.internal.{UnUnion, Union}
 import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, Future}
 import scala.util.Try
+import cakeless.tagging._
 
 class KernelSpec extends FlatSpec {
+  type foo = Witness.`"foo"`.T
+
+  case class FooWiringConcrete(foo: Int @@ foo)
 
   trait FooComponent {
     def foo: Int
@@ -307,5 +311,38 @@ class KernelSpec extends FlatSpec {
 
     assert(result.isSuccess)
     assert(result.get == "foo")
+  }
+
+  "CakeT.asR.wired" should "work correctly" in {
+    val c0 = cake[FooComponent].asR[FooWiringConcrete].widen
+
+    val result = c0.bake(FooWiringConcrete(1.tagged[foo]))
+    assert(result.foo == 1)
+  }
+
+  "CakeT.depMap" should "work correctly" in {
+    val c0: Cake.Aux[FooComponent, FooWiringConcrete] = cake[FooComponent].asR[FooWiringConcrete].widen
+    val c1 = c0.depMap { (dep, fooComponent) =>
+      s"${dep.foo}=${fooComponent.foo}"
+    }
+
+    val result = c1.bake(FooWiringConcrete(1.tagged[foo]))
+
+    assert(result == "1=1")
+  }
+
+  "CakeT.depFlatMap" should "work correctly" in {
+    val c0 = cake[FooComponent]
+    val c1 = c0.depFlatMap { (dep, fooComponent) =>
+      cake[BarComponent].map { bar =>
+        s"$dep --> ${bar.bar}"
+      }
+    }
+
+    assertCompiles("""implicitly[c1.Dependencies <:< (Int :: String :: HNil)]""")
+
+    val result = c1.bake(1 :: "foo" :: HNil)
+
+    assert(result == "1 :: HNil --> foo")
   }
 }

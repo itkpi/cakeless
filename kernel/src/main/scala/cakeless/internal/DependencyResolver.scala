@@ -37,7 +37,7 @@ class DependencyResolver(val c: whitebox.Context) extends MacroUtils {
 
   protected def instantiate[A: WeakTypeTag](
       mainType: Type,
-      constructorParams: List[Type],
+      constructorParams: List[List[Type]],
       abstractValues: List[MethodSymbol],
       depsValueName: TermName,
       depsType: Tree
@@ -51,9 +51,14 @@ class DependencyResolver(val c: whitebox.Context) extends MacroUtils {
       println(sep)
     }
 
-    val passConstructorParams = constructorParams.indices.map { idx =>
-      c.untypecheck(q"$depsValueName($idx)")
-    }
+    val (passConstructorParams, hlistOffset) = constructorParams
+      .foldLeft(List.empty[List[Tree]] -> 0) {
+        case ((paramsAcc, offset), carry) =>
+          val carryAssignments: List[Tree] = carry.indices.map { idx =>
+            c.untypecheck(q"""$depsValueName(${offset + idx})""")
+          }.toList
+          (paramsAcc :+ carryAssignments, offset + carry.size)
+      }
 
     ifDebug {
       println(
@@ -63,10 +68,9 @@ class DependencyResolver(val c: whitebox.Context) extends MacroUtils {
     }
 
     val assignments = {
-      val offset = constructorParams.size
       abstractValues.zipWithIndex.map {
         case (method, idx) =>
-          c.untypecheck(q"override lazy val ${method.name} = $depsValueName(${offset + idx})")
+          c.untypecheck(q"override lazy val ${method.name} = $depsValueName(${hlistOffset + idx})")
       }
     }
 
@@ -78,7 +82,7 @@ class DependencyResolver(val c: whitebox.Context) extends MacroUtils {
     q"""
        new cakeless.Cake[$A] {
          type Dependencies = $depsType
-         def bake($depsValueName: $depsType): $A = new $mainType(..$passConstructorParams) with ..$typeRefinements { ..$assignments }
+         def bake($depsValueName: $depsType): $A = new $mainType(...$passConstructorParams) with ..$typeRefinements { ..$assignments }
        }"""
   }
 
@@ -122,15 +126,17 @@ class DependencyResolver(val c: whitebox.Context) extends MacroUtils {
     val constructorParams = {
       if (mainType.decls.exists(s => s.isMethod && s.asMethod.isConstructor)) {
         if (constNum == 0)
-          primaryConstructorParams(mainType)
+          mainType.decls
+            .collectFirst { case m: MethodSymbol if m.isPrimaryConstructor => m }
+            .getOrElse(fail("Unable to discern primary constructor."))
+            .paramLists
         else {
           val constructorsList = mainType.decls.collect { case m: MethodSymbol if m.isConstructor => m }.toList
 
           assertMacro(constNum < constructorsList.size,
                       s"Chosen $constNum constructor but found only ${constructorsList.size} constructors")
 
-          constructorsList(constNum).paramLists.headOption
-            .getOrElse(fail(s"Constructor #$constNum missing paramList."))
+          constructorsList(constNum).paramLists
         }
       } else {
         if (constNum > 0) c.warning(c.enclosingPosition, s"$mainType doesn't have constructors at all but requested #$constNum constructor")
@@ -142,11 +148,11 @@ class DependencyResolver(val c: whitebox.Context) extends MacroUtils {
       println(s"#$constNum constructor params: $constructorParams")
       println(sep)
     }
-    val deps = buildHListType(constructorParams.map(_.typeSignature.dealias) ++ abstractMembersReturnTypes)
+    val deps = buildHListType(constructorParams.flatMap(_.map(_.typeSignature.dealias)) ++ abstractMembersReturnTypes)
 
     val expr = instantiate[A](
       mainType,
-      constructorParams.map(_.typeSignature.dealias),
+      constructorParams.map(_.map(_.typeSignature.dealias)),
       abstractValues,
       TermName("deps"),
       deps

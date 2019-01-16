@@ -36,7 +36,7 @@ trait AllComponents2 { self: ExecutionContextComponent with PropsComponent =>
   }
 }
 
-class NestedComponent(val token: String @@ token) { self: AllComponents2 with ExecutionContextComponent with PropsComponent =>
+class NestedComponent(implicit val token: String @@ token) { self: AllComponents2 with ExecutionContextComponent with PropsComponent =>
   def getConfigAsync(config: Config)(key: String): Future[Option[String]] = Future {
     scala.util.Try(config getString key).toOption
   }

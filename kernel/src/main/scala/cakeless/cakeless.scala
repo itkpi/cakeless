@@ -2,7 +2,7 @@ import scala.language.experimental.macros
 import scala.language.{higherKinds, implicitConversions}
 import cats.Id
 import cakeless.internal.DependencyResolver
-import shapeless.HNil
+import shapeless.{::, HNil}
 
 package object cakeless {
   type Cake[A] = CakeT[Id, A]
@@ -27,4 +27,7 @@ package object cakeless {
   def cakeT[F[_], A]: CakeT[F, A] = macro DependencyResolver.makeCakeT0[F, A]
 
   def cakeT[F[_], A](constructor: Int): CakeT[F, A] = macro DependencyResolver.makeCakeT[F, A]
+
+  implicit def dropHNilDependency[F[_], A, D](cake: CakeT.Aux[F, A, D :: HNil]): CakeT.Aux[F, A, D] =
+    cake.comap[D](_ :: HNil)
 }
