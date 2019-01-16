@@ -11,6 +11,7 @@ import scala.concurrent.{Await, Future}
 import scala.util.Try
 
 class KernelSpec extends FlatSpec {
+
   trait FooComponent {
     def foo: Int
   }
@@ -21,7 +22,8 @@ class KernelSpec extends FlatSpec {
 
   case class FooBarWiring(foo: Int, bar: String)
 
-  trait FooBarComponent { self: FooComponent with BarComponent =>
+  trait FooBarComponent {
+    self: FooComponent with BarComponent =>
     def fooBar: String = foo + bar
   }
 
@@ -29,8 +31,14 @@ class KernelSpec extends FlatSpec {
     def baz: Double
   }
 
-  trait BarBazComponent { self: BarComponent with BazComponent =>
+  trait BarBazComponent {
+    self: BarComponent with BazComponent =>
     def barBaz: String = bar + baz
+  }
+
+  class ComponentWithConstructors(val bg: BigInt) {
+    self: FooComponent =>
+    def this(l: Long) = this(BigInt(l))
   }
 
   case class BarBazWiring(bar: String, baz: Double)
@@ -42,8 +50,8 @@ class KernelSpec extends FlatSpec {
   }
 
   "UnUnion" should "work correctly" in {
-    val a: Int :: String :: HNil               = 1 :: "foo" :: HNil
-    val b: String :: Double :: HNil            = "foo" :: 2.0 :: HNil
+    val a: Int :: String :: HNil = 1 :: "foo" :: HNil
+    val b: String :: Double :: HNil = "foo" :: 2.0 :: HNil
     val union: Int :: String :: Double :: HNil = a union b
 
     val unUnion = UnUnion[Int :: String :: HNil, String :: Double :: HNil, Int :: String :: Double :: HNil]
@@ -63,12 +71,12 @@ class KernelSpec extends FlatSpec {
   }
 
   it should "work correctly" in {
-    val c1     = cake[FooComponent]
+    val c1 = cake[FooComponent]
     val result = c1.bake(1 :: HNil)
 
     assert(result.foo == 1)
 
-    val c2      = cake[FooComponent with BarComponent]
+    val c2 = cake[FooComponent with BarComponent]
     val result2 = c2.bake(2 :: "bar" :: HNil)
 
     assert(result2.foo == 2)
@@ -84,14 +92,14 @@ class KernelSpec extends FlatSpec {
   }
 
   it should "work correctly" in {
-    val c1      = cake[FooBarComponent with FooComponent with BarComponent]
+    val c1 = cake[FooBarComponent with FooComponent with BarComponent]
     val result0 = c1.bake(1 :: "foo" :: HNil)
 
     assert(result0.foo == 1)
     assert(result0.bar == "foo")
     assert(result0.fooBar == "1foo")
 
-    val c2      = cake[BarBazComponent with BarComponent with BazComponent]
+    val c2 = cake[BarBazComponent with BarComponent with BazComponent]
     val result1 = c2.bake("bar" :: 2.0 :: HNil)
 
     assert(result1.bar == "bar")
@@ -100,7 +108,7 @@ class KernelSpec extends FlatSpec {
   }
 
   "cake.bake with Generic" should "work correctly" in {
-    val c2      = cake[BarBazComponent with BarComponent with BazComponent]
+    val c2 = cake[BarBazComponent with BarComponent with BazComponent]
     val result1 = c2.as[BarBazWiring] bake BarBazWiring(bar = "bar", baz = 2.0)
 
     assert(result1.bar == "bar")
@@ -108,13 +116,13 @@ class KernelSpec extends FlatSpec {
   }
 
   "cake.map" should "work correctly" in {
-    val c1      = cake[FooComponent].map(_.foo + 2)
+    val c1 = cake[FooComponent].map(_.foo + 2)
     val result1 = c1.bake(1 :: HNil)
     assert(result1 == 3)
   }
 
   "cake.comap" should "work correctly" in {
-    val c1      = cake[FooComponent].comap[String](s => s.toInt :: HNil)
+    val c1 = cake[FooComponent].comap[String](s => s.toInt :: HNil)
     val result1 = c1.bake("10")
     assert(result1.foo == 10)
   }
@@ -190,7 +198,7 @@ class KernelSpec extends FlatSpec {
   }
 
   "cake.mapK" should "work correctly" in {
-    val c1   = cake[FooBarComponent with FooComponent with BarComponent]
+    val c1 = cake[FooBarComponent with FooComponent with BarComponent]
     val cTry = c1.mapK[Try](λ[Id[?] ~> Try[?]](Try(_)))
 
     val result = cTry.as[FooBarWiring] bake FooBarWiring(foo = 1, bar = "foo")
@@ -200,7 +208,7 @@ class KernelSpec extends FlatSpec {
     assert(result.get.bar == "foo")
   }
 
-  "cakeT" should "be automatically derived for any applicative" in {
+  "cakeT" should "be able to be created for any applicative" in {
     import scala.concurrent.ExecutionContext.Implicits.global
 
     val c1 = cakeT[Try, FooBarComponent with FooComponent with BarComponent]
@@ -220,4 +228,42 @@ class KernelSpec extends FlatSpec {
     assert(log == List("foo"))
     assert(result == "1foofoo2.0")
   }
+
+  "cake" should "provide CakeT with specific constructor" in {
+    val c0 = cake[ComponentWithConstructors with FooComponent]
+    val c1 = cake[ComponentWithConstructors with FooComponent](1)
+
+    assertCompiles("""implicitly[c0.Dependencies <:< (BigInt :: Int :: HNil)]""")
+    assertCompiles("""implicitly[c1.Dependencies <:< (Long :: Int :: HNil)]""")
+
+    val program = for {
+      c0 <- c0
+      c1 <- c1
+    } yield c0.bg + c1.bg
+
+    assertCompiles("""implicitly[program.Dependencies <:< (BigInt :: Int :: Long :: HNil)]""")
+
+    val result = program.bake(BigInt(1) :: 0 :: 2L :: HNil)
+    assert(result == BigInt(3))
+  }
+
+  "cakeT" should "provide CakeT with specific constructor" in {
+    val c0 = cakeT[Try, ComponentWithConstructors with FooComponent]
+    val c1 = cakeT[Try, ComponentWithConstructors with FooComponent](1)
+
+    assertCompiles("""implicitly[c0.Dependencies <:< (BigInt :: Int :: HNil)]""")
+    assertCompiles("""implicitly[c1.Dependencies <:< (Long :: Int :: HNil)]""")
+
+    val program = for {
+      c0 <- c0
+      c1 <- c1
+    } yield c0.bg + c1.bg
+
+    assertCompiles("""implicitly[program.Dependencies <:< (BigInt :: Int :: Long :: HNil)]""")
+
+    val result = program.bake(BigInt(1) :: 0 :: 2L :: HNil)
+    assert(result.isSuccess)
+    assert(result.get == BigInt(3))
+  }
+
 }

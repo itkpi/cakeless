@@ -3,14 +3,18 @@ import scala.language.{higherKinds, implicitConversions}
 import cats.Id
 import cakeless.internal.DependencyResolver
 
-package object cakeless extends LowPriorityCakes {
+package object cakeless {
   type Cake[A] = CakeT[Id, A]
+
   object Cake {
-    type Aux[A, D0] = Cake[A] { type Dependencies = D0 }
+    type Aux[A, D0] = Cake[A] {type Dependencies = D0}
   }
 
-  implicit def derive[A]: Cake[A] = macro DependencyResolver.makeCake[A]
+  def cake[A]: Cake[A] = macro DependencyResolver.makeCake0[A]
 
-  def cake[A](implicit ev: Cake[A]): Cake.Aux[A, ev.Dependencies]                = ev
-  def cakeT[F[_], A](implicit ev: CakeT[F, A]): CakeT.Aux[F, A, ev.Dependencies] = ev
+  def cake[A](constructor: Int): Cake[A] = macro DependencyResolver.makeCake[A]
+
+  def cakeT[F[_], A]: CakeT[F, A] = macro DependencyResolver.makeCakeT0[F, A]
+
+  def cakeT[F[_], A](constructor: Int): CakeT[F, A] = macro DependencyResolver.makeCakeT[F, A]
 }
