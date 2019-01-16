@@ -7,6 +7,7 @@ import scala.reflect.macros.whitebox
 import japgolly.microlibs.macro_utils.MacroUtils
 
 class DependencyResolver(val c: whitebox.Context) extends MacroUtils {
+
   import c.universe._
 
   private val hnil = typeOf[HNil].dealias
@@ -21,7 +22,7 @@ class DependencyResolver(val c: whitebox.Context) extends MacroUtils {
 
   private def buildHListType(returnTypes: List[Type]): Tree = {
     def buildHList(head: Type, remaining: List[Type]): Tree = remaining match {
-      case Nil                  => tq"shapeless.::[$head, $hnil]"
+      case Nil => tq"shapeless.::[$head, $hnil]"
       case scala.::(dep, rest0) => tq"shapeless.::[$head, ${buildHList(dep, rest0)}]"
     }
 
@@ -31,16 +32,16 @@ class DependencyResolver(val c: whitebox.Context) extends MacroUtils {
 
   private def extractClassesChain(tpe: Type): List[Type] = tpe match {
     case RefinedType(types, _) => types.flatMap(extractClassesChain)
-    case _                     => tpe :: Nil
+    case _ => tpe :: Nil
   }
 
   private def instantiate[A: WeakTypeTag](
-      mainType: Type,
-      constructorParams: List[Type],
-      abstractValues: List[MethodSymbol],
-      depsValueName: TermName,
-      depsType: Tree
-  ): Tree = {
+                                           mainType: Type,
+                                           constructorParams: List[Type],
+                                           abstractValues: List[MethodSymbol],
+                                           depsValueName: TermName,
+                                           depsType: Tree
+                                         ): Tree = {
     val A = weakTypeOf[A].dealias
 
     val typeRefinements = extractClassesChain(A).filterNot(_ =:= mainType)
@@ -81,8 +82,18 @@ class DependencyResolver(val c: whitebox.Context) extends MacroUtils {
        }"""
   }
 
-  def makeCake[A: WeakTypeTag]: Tree = {
+  def makeCake0[A: WeakTypeTag]: Tree = makeCake[A](reify(0))
+
+  def makeCake[A: WeakTypeTag](constructor: Expr[Int]): Tree = {
     val A = weakTypeOf[A].dealias
+
+    val constNum: Int = constructor match {
+      case Expr(Literal(Constant(n: Int))) =>
+        assertMacro(n >= 0, s"`constructor` should not be less than 0")
+        n
+      case _ =>
+        fail(s"`constructor` must be constant Int! Given: $constructor")
+    }
 
     val abstractValues = A.typeSymbol.asClass.selfType.members
       .filter(s => s.isMethod && s.isAbstract)
@@ -100,7 +111,7 @@ class DependencyResolver(val c: whitebox.Context) extends MacroUtils {
 
     val mainType = A match {
       case RefinedType(types, _) => types.head
-      case _                     => A
+      case _ => A
     }
 
     ifDebug {
@@ -109,12 +120,26 @@ class DependencyResolver(val c: whitebox.Context) extends MacroUtils {
     }
 
     val constructorParams = {
-      if (mainType.decls.exists(s => s.isMethod && s.asMethod.isPrimaryConstructor)) primaryConstructorParams(mainType)
-      else Nil
+      if (mainType.decls.exists(s => s.isMethod && s.asMethod.isConstructor)) {
+        if (constNum == 0)
+          primaryConstructorParams(mainType)
+        else {
+          val constructorsList = mainType.decls.collect { case m: MethodSymbol if m.isConstructor => m }.toList
+
+          assertMacro(constNum < constructorsList.size,
+            s"Chosen $constNum constructor but found only ${constructorsList.size} constructors")
+
+          constructorsList(constNum).paramLists.headOption
+            .getOrElse(fail(s"Constructor #$constNum missing paramList."))
+        }
+      } else {
+        if (constNum > 0) c.warning(c.enclosingPosition, s"$mainType doesn't have constructors at all but requested #$constNum constructor")
+        Nil
+      }
     }
 
     ifDebug {
-      println(s"Primary constructor params: $constructorParams")
+      println(s"#$constNum constructor params: $constructorParams")
       println(sep)
     }
     val deps = buildHListType(constructorParams.map(_.typeSignature.dealias) ++ abstractMembersReturnTypes)
@@ -130,6 +155,31 @@ class DependencyResolver(val c: whitebox.Context) extends MacroUtils {
     ifDebug {
       println(sep)
       println("Generated code:\n" + expr)
+      println(sep)
+    }
+
+    expr
+  }
+
+  def makeCakeT0[F[_], A: WeakTypeTag](implicit _F: WeakTypeTag[F[_]]): Tree = makeCakeT[F, A](reify(0))
+
+  def makeCakeT[F[_], A: WeakTypeTag](constructor: Expr[Int])(implicit _F: WeakTypeTag[F[_]]): Tree = {
+    val F = _F.tpe.dealias.typeConstructor.etaExpand
+
+    val baseCake = makeCake[A](constructor)
+
+    val expr =
+      q"""
+       import cats.{~>, Id, Applicative}
+
+       $baseCake.mapK[$F](new ~>[Id, $F] {
+         def apply[A](fa: A) = Applicative[$F].pure(fa)
+       })
+     """
+
+    ifDebug {
+      println(sep)
+      println(expr)
       println(sep)
     }
 
