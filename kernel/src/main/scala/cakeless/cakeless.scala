@@ -1,6 +1,6 @@
 import scala.language.experimental.macros
-import scala.language.higherKinds
-import cats.{~>, Applicative, Id}
+import scala.language.{higherKinds, implicitConversions}
+import cats.Id
 import cakeless.internal.DependencyResolver
 
 package object cakeless extends LowPriorityCakes {

@@ -67,6 +67,9 @@ trait CakeT[F[_], A] extends Serializable { self =>
       type Dependencies = self.Dependencies
       def bake(deps: Dependencies): WriterT[F, L, A] = WriterT.liftF(self bake deps).tell(logRecord)
     }
+
+  def widen[D0 <: Dependencies]: CakeT.Aux[F, A, D0] =
+    self.asInstanceOf[CakeT.Aux[F, A, D0]]
 }
 
 object CakeT {
