@@ -1,6 +1,6 @@
 ---
 Project: Cakeless
-Current version: 0.2-SNAPSHOT
+Current version: 0.2.1-SNAPSHOT
 Scala version: 2.11.12, 2.12.8
 ---
 
@@ -22,8 +22,7 @@ libraryDependencies ++= {
   val cakelessV = "0.2-SNAPSHOT"
   Seq(
     "ua.pp.itkpi" %% "cakeless" % cakelessV,
-    "ua.pp.itkpi" %% "cakeless-cats-effect" % cakelessV,
-    "ua.pp.itkpi" %% "cakeless-lifecycle" % cakelessV
+    "ua.pp.itkpi" %% "cakeless-cats-effect" % cakelessV
   )
 }
 ```
