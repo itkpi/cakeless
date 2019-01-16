@@ -1,6 +1,6 @@
 ---
 Project: Cakeless
-Current version: 0.1-SNAPSHOT
+Current version: 0.2-SNAPSHOT
 Scala version: 2.11.12, 2.12.8
 ---
 
@@ -19,7 +19,7 @@ To try it, add the following into your `build.sbt` file:
 resolvers += "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"
 
 libraryDependencies ++= {
-  val cakelessV = "0.1-SNAPSHOT"
+  val cakelessV = "0.2-SNAPSHOT"
   Seq(
     "ua.pp.itkpi" %% "cakeless" % cakelessV,
     "ua.pp.itkpi" %% "cakeless-cats-effect" % cakelessV,
@@ -102,4 +102,7 @@ val result1: String = program bake Wiring(
 )
 ```
 
-For full example and integration with `cats.effect` see [here](https://github.com/itkpi/cakeless/blob/master/examples/src/main/scala/com/examples/Basic.scala)
+For full example and integration with `cats.effect` see [here](examples/src/main/scala/com/examples/Basic.scala)
+
+# Lifecycle management and Cats Effect integrations
+See [example](examples/src/main/scala/com/examples/LifecycleExample.scala)

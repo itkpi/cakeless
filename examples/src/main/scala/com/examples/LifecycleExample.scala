@@ -59,7 +59,7 @@ object LifecycleExample extends IOApp {
       })(release = _.db.close())
     }
 
-    program bake WiringWithDb(
+    program.as[WiringWithDb] bake WiringWithDb(
       ec = ExecutionContext.global,
       configPath = Paths.get("/") taggedAs "config",
       props = Map("foo" -> "bar") taggedAs "props",

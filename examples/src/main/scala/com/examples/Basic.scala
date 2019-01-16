@@ -44,7 +44,7 @@ object Basic extends IOApp {
     }
 
     val result: WriterT[IO, List[String], IO[Option[String]]] =
-      program bake Wiring(
+      program.as[Wiring] bake Wiring(
         ec = ExecutionContext.global,
         configPath = Paths.get("examples/src/main/resources/application.conf").tagged[config],
         props = Map("foo.bar" -> "hostname").tagged[props],

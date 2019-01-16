@@ -2,12 +2,10 @@ package cakeless
 
 import cats._
 import cats.implicits._
-import cats.data.{Reader, ReaderT, Writer, WriterT}
+import cats.data.WriterT
 import org.scalatest.FlatSpec
 import shapeless.{::, HNil}
-import shapeless.ops.hlist.Union
-import cakeless.internal.UnUnion
-
+import cakeless.internal.{UnUnion, Union}
 import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, Future}
 import scala.util.Try
@@ -38,6 +36,10 @@ class KernelSpec extends FlatSpec {
   case class BarBazWiring(bar: String, baz: Double)
 
   case class FooBarBazWiring(foo: Int, bar: String, baz: Double)
+
+  "Union" should "work for case classes" in {
+    assertCompiles("""implicitly[Union.Aux[FooBarWiring, BarBazWiring, FooBarBazWiring]]""")
+  }
 
   "UnUnion" should "work correctly" in {
     val a: Int :: String :: HNil               = 1 :: "foo" :: HNil
@@ -99,7 +101,7 @@ class KernelSpec extends FlatSpec {
 
   "cake.bake with Generic" should "work correctly" in {
     val c2      = cake[BarBazComponent with BarComponent with BazComponent]
-    val result1 = c2 bake BarBazWiring(bar = "bar", baz = 2.0)
+    val result1 = c2.as[BarBazWiring] bake BarBazWiring(bar = "bar", baz = 2.0)
 
     assert(result1.bar == "bar")
     assert(result1.baz == 2.0)
@@ -109,6 +111,12 @@ class KernelSpec extends FlatSpec {
     val c1      = cake[FooComponent].map(_.foo + 2)
     val result1 = c1.bake(1 :: HNil)
     assert(result1 == 3)
+  }
+
+  "cake.comap" should "work correctly" in {
+    val c1      = cake[FooComponent].comap[String](s => s.toInt :: HNil)
+    val result1 = c1.bake("10")
+    assert(result1.foo == 10)
   }
 
   "cake.flatMap" should "accumulate depedencies on the typelevel" in {
@@ -152,7 +160,7 @@ class KernelSpec extends FlatSpec {
   it should "be correctly converted into Reader using shapeless.Generic" in {
     val c1 = cake[FooBarComponent with FooComponent with BarComponent]
 
-    val reader = c1.toReader[FooBarWiring]
+    val reader = c1.as[FooBarWiring].toReader
     val result = reader.run(FooBarWiring(foo = 1, bar = "foo"))
     assert(result.foo == 1)
     assert(result.bar == "foo")
@@ -185,7 +193,7 @@ class KernelSpec extends FlatSpec {
     val c1   = cake[FooBarComponent with FooComponent with BarComponent]
     val cTry = c1.mapK[Try](λ[Id[?] ~> Try[?]](Try(_)))
 
-    val result = cTry bake FooBarWiring(foo = 1, bar = "foo")
+    val result = cTry.as[FooBarWiring] bake FooBarWiring(foo = 1, bar = "foo")
 
     assert(result.isSuccess)
     assert(result.get.foo == 1)
@@ -205,7 +213,7 @@ class KernelSpec extends FlatSpec {
       c2 <- c2
     } yield c1.fooBar + c2.barBaz
 
-    val writer = program bake FooBarBazWiring(foo = 1, bar = "foo", baz = 2.0)
+    val writer = program.as[FooBarBazWiring] bake FooBarBazWiring(foo = 1, bar = "foo", baz = 2.0)
 
     val (log, result) = Await.result(writer.run, Duration.Inf)
 

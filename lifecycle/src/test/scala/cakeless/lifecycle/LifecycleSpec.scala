@@ -35,7 +35,7 @@ class LifecycleSpec extends FlatSpec {
       Try({})
     }
 
-    c bake sampleWiring
+    c.as[SampleWiring] bake sampleWiring
 
     assert(isBeforeInstantiation)
   }
@@ -62,7 +62,7 @@ class LifecycleSpec extends FlatSpec {
       isBeforeInstantiation = false
     }
 
-    c bake sampleWiring
+    c.as[SampleWiring] bake sampleWiring
 
     assert(isBeforeInstantiation)
   }
@@ -91,7 +91,7 @@ class LifecycleSpec extends FlatSpec {
       Try({})
     }
 
-    c bake sampleWiring
+    c.as[SampleWiring] bake sampleWiring
 
     assert(isAfterInstantiation)
   }
@@ -119,7 +119,7 @@ class LifecycleSpec extends FlatSpec {
       isAfterInstantiation = true
     }
 
-    c bake sampleWiring
+    c.as[SampleWiring] bake sampleWiring
 
     assert(isAfterInstantiation)
   }
@@ -254,5 +254,5 @@ class LifecycleSpec extends FlatSpec {
 
   private def getMockFunc  = mock(classOf[() => Unit])
   private val sampleWiring = SampleWiring(1)
-  private val sampleCake   = cakeT[Try, SampleComponent]
+  private val sampleCake   = cakeT[Try, SampleComponent].as[SampleWiring]
 }
