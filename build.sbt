@@ -72,9 +72,18 @@ lazy val lifecycle = sonatypeProject(id = "cakeless-lifecycle", base = file("./l
     }
   )
 
+lazy val tagging = sonatypeProject(id = "cakeless-tagging", base = file("./tagging"))
+  .settings(
+    libraryDependencies ++= {
+      Seq(
+        Shapeless.value
+      )
+    }
+  )
+
 lazy val examples = project
   .in(file("./examples"))
-  .dependsOn(kernel, `cats-effect`, lifecycle)
+  .dependsOn(kernel, `cats-effect`, lifecycle, tagging)
   .settings(
     name := "examples",
     version := v,
@@ -91,7 +100,7 @@ lazy val examples = project
 lazy val root = project
   .in(file("."))
   .dependsOn(examples)
-  .aggregate(kernel, `cats-effect`, lifecycle)
+  .aggregate(kernel, `cats-effect`, lifecycle, tagging)
   .settings(
     name := "cakeless",
     version := v,

@@ -9,6 +9,8 @@ import cats._
 import cats.implicits._
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
+import cakeless.tagging._
+import shapeless.syntax.singleton._
 
 object LifecycleExample extends IOApp {
   def run(args: List[String]): IO[ExitCode] = {
@@ -59,8 +61,8 @@ object LifecycleExample extends IOApp {
 
     program bake WiringWithDb(
       ec = ExecutionContext.global,
-      configPath = Paths.get("/"),
-      props = Map("foo" -> "bar"),
+      configPath = Paths.get("/") taggedAs "config",
+      props = Map("foo" -> "bar") taggedAs "props",
       db = new Database[IO]
     ) redeem (
       recover = _ => ExitCode.Error,

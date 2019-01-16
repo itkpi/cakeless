@@ -5,10 +5,10 @@ import cats.implicits._
 import cats.data.WriterT
 import cats.effect.{ExitCode, IO, IOApp}
 import java.nio.file.{Path, Paths}
-import scala.concurrent.{ExecutionContext, Future}
-import com.typesafe.config.{Config, ConfigFactory}
+import scala.concurrent.ExecutionContext
 import cakeless._
 import cakeless.cats_effect._
+import cakeless.tagging._
 
 object Basic extends IOApp {
 
@@ -46,9 +46,9 @@ object Basic extends IOApp {
     val result: WriterT[IO, List[String], IO[Option[String]]] =
       program bake Wiring(
         ec = ExecutionContext.global,
-        configPath = Paths.get("examples/src/main/resources/application.conf"),
-        props = Map("foo.bar" -> "hostname"),
-        token = "1232asd"
+        configPath = Paths.get("examples/src/main/resources/application.conf").tagged[config],
+        props = Map("foo.bar" -> "hostname").tagged[props],
+        token = "1232asd".tagged[token]
       ) tell List("Created cake!")
 
     result.run

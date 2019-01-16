@@ -1,29 +1,28 @@
 package com.examples
 
 import java.nio.file.Path
-
 import cats.effect.IO
-import cats.{Monad, MonadError}
+import cats.MonadError
 import com.typesafe.config.{Config, ConfigFactory}
-
 import scala.concurrent.{ExecutionContext, Future}
 import scala.language.higherKinds
+import cakeless.tagging._
 
 trait ExecutionContextComponent {
   implicit def ec: ExecutionContext
 }
 
 trait FileConfigComponent {
-  def configPath: Path
+  def configPath: Path @@ config
 }
 
 trait PropsComponent {
-  def props: Map[String, String]
+  def props: Map[String, String] @@ props
 }
 
-case class Wiring(ec: ExecutionContext, configPath: Path, props: Map[String, String], token: String)
+case class Wiring(ec: ExecutionContext, configPath: Path @@ config, props: Map[String, String] @@ props, token: String @@ token)
 
-case class WiringWithDb(ec: ExecutionContext, configPath: Path, props: Map[String, String], db: Database[IO])
+case class WiringWithDb(ec: ExecutionContext, configPath: Path @@ config, props: Map[String, String] @@ props, db: Database[IO])
 
 trait AllComponents1 { self: ExecutionContextComponent with FileConfigComponent =>
   def getConfigFileAsync: Future[Config] = Future {
@@ -37,7 +36,7 @@ trait AllComponents2 { self: ExecutionContextComponent with PropsComponent =>
   }
 }
 
-class NestedComponent(val token: String) { self: AllComponents2 with ExecutionContextComponent with PropsComponent =>
+class NestedComponent(val token: String @@ token) { self: AllComponents2 with ExecutionContextComponent with PropsComponent =>
   def getConfigAsync(config: Config)(key: String): Future[Option[String]] = Future {
     scala.util.Try(config getString key).toOption
   }
