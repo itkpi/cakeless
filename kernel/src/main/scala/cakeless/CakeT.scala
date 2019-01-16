@@ -104,6 +104,25 @@ trait CakeT[F[_], A] extends Serializable { self =>
     }
 
   /**
+    * [[comap]] like operation
+    * allowing to change [[Dependencies]] type for this cake
+    * using monadic transformation function
+    *
+    * For instance, you may want to make [[Dependencies]] less wide
+    * flattening dependencies with some already known values.
+    *
+    * @tparam D2 - new dependency type
+    * @param f - monadic transformation function
+    * @return - cake for same component with updated dependency type
+    * */
+  def comapM[D2](f: D2 => F[Dependencies])(implicit F: FlatMap[F]): CakeT.Aux[F, A, D2] =
+    new CakeT[F, A] {
+      type Dependencies = D2
+
+      def bake(deps: D2): F[A] = F.flatMap(f(deps))(self.bake)
+    }
+
+  /**
     * Typical functor operation
     * allowing to transform wired component.
     *

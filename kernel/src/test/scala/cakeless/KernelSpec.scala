@@ -381,4 +381,15 @@ class KernelSpec extends FlatSpec {
     val result = c0.bake(1 :: "foo" :: HNil)
     assert(result.test == "1 + foo")
   }
+
+  "CakeT.comapM" should "work correctly" in {
+    val c0: CakeT.Aux[Try, FooComponent, Int] = cakeT[Try, FooComponent]
+    val c1 = c0.comapM[String] { str: String =>
+      Try(str.toInt)
+    }
+
+    val result = c1 bake "2"
+    assert(result.isSuccess)
+    assert(result.get.foo == 2)
+  }
 }
