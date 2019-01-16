@@ -10,19 +10,19 @@ class DependencyResolver(val c: whitebox.Context) extends MacroUtils {
 
   import c.universe._
 
-  private val hnil = typeOf[HNil].dealias
+  protected val hnil = typeOf[HNil].dealias
 
-  private val debug = sys.env.getOrElse("cakeless_macro_debug", "false").toBoolean
+  protected val debug = sys.env.getOrElse("cakeless_macro_debug", "false").toBoolean
 
-  private def assertMacro(cond: Boolean, msg: String): Unit =
+  protected def assertMacro(cond: Boolean, msg: String): Unit =
     if (!cond) c.abort(c.enclosingPosition, msg)
 
-  private def ifDebug[U](thunk: => U): Unit =
+  protected def ifDebug[U](thunk: => U): Unit =
     if (debug) thunk
 
-  private def buildHListType(returnTypes: List[Type]): Tree = {
+  protected def buildHListType(returnTypes: List[Type]): Tree = {
     def buildHList(head: Type, remaining: List[Type]): Tree = remaining match {
-      case Nil => tq"shapeless.::[$head, $hnil]"
+      case Nil                  => tq"shapeless.::[$head, $hnil]"
       case scala.::(dep, rest0) => tq"shapeless.::[$head, ${buildHList(dep, rest0)}]"
     }
 
@@ -30,18 +30,18 @@ class DependencyResolver(val c: whitebox.Context) extends MacroUtils {
     buildHList(first, rest)
   }
 
-  private def extractClassesChain(tpe: Type): List[Type] = tpe match {
+  protected def extractClassesChain(tpe: Type): List[Type] = tpe match {
     case RefinedType(types, _) => types.flatMap(extractClassesChain)
-    case _ => tpe :: Nil
+    case _                     => tpe :: Nil
   }
 
-  private def instantiate[A: WeakTypeTag](
-                                           mainType: Type,
-                                           constructorParams: List[Type],
-                                           abstractValues: List[MethodSymbol],
-                                           depsValueName: TermName,
-                                           depsType: Tree
-                                         ): Tree = {
+  protected def instantiate[A: WeakTypeTag](
+      mainType: Type,
+      constructorParams: List[Type],
+      abstractValues: List[MethodSymbol],
+      depsValueName: TermName,
+      depsType: Tree
+  ): Tree = {
     val A = weakTypeOf[A].dealias
 
     val typeRefinements = extractClassesChain(A).filterNot(_ =:= mainType)
@@ -111,7 +111,7 @@ class DependencyResolver(val c: whitebox.Context) extends MacroUtils {
 
     val mainType = A match {
       case RefinedType(types, _) => types.head
-      case _ => A
+      case _                     => A
     }
 
     ifDebug {
@@ -127,7 +127,7 @@ class DependencyResolver(val c: whitebox.Context) extends MacroUtils {
           val constructorsList = mainType.decls.collect { case m: MethodSymbol if m.isConstructor => m }.toList
 
           assertMacro(constNum < constructorsList.size,
-            s"Chosen $constNum constructor but found only ${constructorsList.size} constructors")
+                      s"Chosen $constNum constructor but found only ${constructorsList.size} constructors")
 
           constructorsList(constNum).paramLists.headOption
             .getOrElse(fail(s"Constructor #$constNum missing paramList."))

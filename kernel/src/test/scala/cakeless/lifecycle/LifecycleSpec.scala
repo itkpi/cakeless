@@ -1,14 +1,10 @@
 package cakeless.lifecycle
 
 import cakeless._
-import cats._
 import cats.implicits._
-import shapeless.{::, HNil}
 import org.mockito.Mockito._
-import org.mockito.ArgumentMatchers._
 import org.scalatest.FlatSpec
-
-import scala.util.{Failure, Try}
+import scala.util.Try
 
 class LifecycleSpec extends FlatSpec {
   "Lifecycle.preStartF" should "work correctly" in {

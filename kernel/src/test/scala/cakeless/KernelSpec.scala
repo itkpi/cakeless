@@ -50,8 +50,8 @@ class KernelSpec extends FlatSpec {
   }
 
   "UnUnion" should "work correctly" in {
-    val a: Int :: String :: HNil = 1 :: "foo" :: HNil
-    val b: String :: Double :: HNil = "foo" :: 2.0 :: HNil
+    val a: Int :: String :: HNil               = 1 :: "foo" :: HNil
+    val b: String :: Double :: HNil            = "foo" :: 2.0 :: HNil
     val union: Int :: String :: Double :: HNil = a union b
 
     val unUnion = UnUnion[Int :: String :: HNil, String :: Double :: HNil, Int :: String :: Double :: HNil]
@@ -71,12 +71,12 @@ class KernelSpec extends FlatSpec {
   }
 
   it should "work correctly" in {
-    val c1 = cake[FooComponent]
+    val c1     = cake[FooComponent]
     val result = c1.bake(1 :: HNil)
 
     assert(result.foo == 1)
 
-    val c2 = cake[FooComponent with BarComponent]
+    val c2      = cake[FooComponent with BarComponent]
     val result2 = c2.bake(2 :: "bar" :: HNil)
 
     assert(result2.foo == 2)
@@ -92,14 +92,14 @@ class KernelSpec extends FlatSpec {
   }
 
   it should "work correctly" in {
-    val c1 = cake[FooBarComponent with FooComponent with BarComponent]
+    val c1      = cake[FooBarComponent with FooComponent with BarComponent]
     val result0 = c1.bake(1 :: "foo" :: HNil)
 
     assert(result0.foo == 1)
     assert(result0.bar == "foo")
     assert(result0.fooBar == "1foo")
 
-    val c2 = cake[BarBazComponent with BarComponent with BazComponent]
+    val c2      = cake[BarBazComponent with BarComponent with BazComponent]
     val result1 = c2.bake("bar" :: 2.0 :: HNil)
 
     assert(result1.bar == "bar")
@@ -108,7 +108,7 @@ class KernelSpec extends FlatSpec {
   }
 
   "cake.bake with Generic" should "work correctly" in {
-    val c2 = cake[BarBazComponent with BarComponent with BazComponent]
+    val c2      = cake[BarBazComponent with BarComponent with BazComponent]
     val result1 = c2.as[BarBazWiring] bake BarBazWiring(bar = "bar", baz = 2.0)
 
     assert(result1.bar == "bar")
@@ -116,13 +116,13 @@ class KernelSpec extends FlatSpec {
   }
 
   "cake.map" should "work correctly" in {
-    val c1 = cake[FooComponent].map(_.foo + 2)
+    val c1      = cake[FooComponent].map(_.foo + 2)
     val result1 = c1.bake(1 :: HNil)
     assert(result1 == 3)
   }
 
   "cake.comap" should "work correctly" in {
-    val c1 = cake[FooComponent].comap[String](s => s.toInt :: HNil)
+    val c1      = cake[FooComponent].comap[String](s => s.toInt :: HNil)
     val result1 = c1.bake("10")
     assert(result1.foo == 10)
   }
@@ -198,7 +198,7 @@ class KernelSpec extends FlatSpec {
   }
 
   "cake.mapK" should "work correctly" in {
-    val c1 = cake[FooBarComponent with FooComponent with BarComponent]
+    val c1   = cake[FooBarComponent with FooComponent with BarComponent]
     val cTry = c1.mapK[Try](λ[Id[?] ~> Try[?]](Try(_)))
 
     val result = cTry.as[FooBarWiring] bake FooBarWiring(foo = 1, bar = "foo")
@@ -266,4 +266,46 @@ class KernelSpec extends FlatSpec {
     assert(result.get == BigInt(3))
   }
 
+  "Cake.pure" should "work correctly" in {
+    val c0 = Cake.pure[Int](1)
+
+    val result = c0.baked
+
+    assert(result == 1)
+  }
+
+  "CakeT.pure" should "work correctly" in {
+    val c0 = CakeT.pure[Try, Int](1)
+
+    val result = c0.baked
+
+    assert(result.isSuccess)
+    assert(result.get == 1)
+  }
+
+  "CakeT.liftF" should "work correctly" in {
+    val c0 = CakeT.liftF[Try, Int](Try { 1 + 1 })
+
+    val result = c0.baked
+
+    assert(result.isSuccess)
+    assert(result.get == 2)
+  }
+
+  "Cake.id" should "work correctly" in {
+    val c0 = Cake.id[String]
+
+    val result = c0.bake("foo")
+
+    assert(result == "foo")
+  }
+
+  "CakeT.id" should "work correctly" in {
+    val c0 = CakeT.id[Try, String]
+
+    val result = c0.bake("foo")
+
+    assert(result.isSuccess)
+    assert(result.get == "foo")
+  }
 }

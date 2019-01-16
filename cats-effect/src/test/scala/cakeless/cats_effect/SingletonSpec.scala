@@ -12,7 +12,7 @@ class SingletonSpec extends FlatSpec {
       def foo: Int
       i += 1
     }
-    val singletonCake = cake[SampleComponent].delayed[IO].singleton
+    val singletonCake = cakeSingleton[IO, SampleComponent]
     val result        = singletonCake.bake(1 :: HNil).unsafeRunSync()
 
     assert(result.foo == 1)

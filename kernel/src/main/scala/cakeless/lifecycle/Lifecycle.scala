@@ -29,8 +29,8 @@ trait Lifecycle[F[_]] {
     handleErrorWith(cake)(e => F.pure(f(e)))
 
   def recoverWith[A](
-      cake: CakeT[F, A]
-  )(f: PartialFunction[Throwable, F[A]]): CakeT.Aux[F, A, cake.Dependencies] =
+                      cake: CakeT[F, A]
+                    )(f: PartialFunction[Throwable, F[A]]): CakeT.Aux[F, A, cake.Dependencies] =
     handleErrorWith(cake)(f.applyOrElse(_, default = (e: Throwable) => throw e))
 
   def recover[A](cake: CakeT[F, A])(f: PartialFunction[Throwable, A])(implicit F: Applicative[F]): CakeT.Aux[F, A, cake.Dependencies] =
@@ -58,7 +58,7 @@ trait LowPriorityLifecycle {
     }
 
     def handleErrorWith[A](cake: CakeT[F, A])(
-        f: Throwable => F[A]
+      f: Throwable => F[A]
     ): Aux[F, A, cake.Dependencies] = new CakeT[F, A] {
       type Dependencies = cake.Dependencies
 

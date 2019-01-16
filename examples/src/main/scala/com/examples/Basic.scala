@@ -1,12 +1,10 @@
 package com.examples
 
-import cats._
 import cats.implicits._
 import cats.data.WriterT
 import cats.effect.{ExitCode, IO, IOApp}
 import java.nio.file.{Path, Paths}
 import scala.concurrent.ExecutionContext
-import cakeless._
 import cakeless.cats_effect._
 import cakeless.tagging._
 
@@ -15,20 +13,17 @@ object Basic extends IOApp {
   def run(args: List[String]): IO[ExitCode] = {
     val program = for {
       comp1 <- {
-        cake[AllComponents1 with ExecutionContextComponent with FileConfigComponent]
-          .delayed[IO]
+        cakeDelayed[IO, AllComponents1 with ExecutionContextComponent with FileConfigComponent]
           .logged(List("Creating Components 1..."))
       }
 
       comp2 <- {
-        cake[AllComponents2 with ExecutionContextComponent with PropsComponent]
-          .delayed[IO]
+        cakeDelayed[IO, AllComponents2 with ExecutionContextComponent with PropsComponent]
           .logged(List("Creating Components 2..."))
       }
 
       comp3 <- {
-        cake[NestedComponent with AllComponents2 with ExecutionContextComponent with FileConfigComponent with PropsComponent]
-          .delayed[IO]
+        cakeDelayed[IO, NestedComponent with AllComponents2 with ExecutionContextComponent with FileConfigComponent with PropsComponent]
           .logged(List("Creating Nested component..."))
       }
 
