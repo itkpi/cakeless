@@ -1,8 +1,9 @@
 package cakeless
 
 import cakeless.internal.{UnUnion, Union}
-import cakeless.lifecycle.Lifecycle
+import cakeless.lifecycle.{Bracket, Initialize, Lifecycle, Shutdown}
 import cats.data.{ReaderT, WriterT}
+import cats.effect.ExitCase
 import cats.kernel.Monoid
 import cats.{~>, Applicative, FlatMap, Functor, Monad}
 import shapeless.{Generic, HNil, Nat}
@@ -205,6 +206,17 @@ trait CakeT[F[_], A] extends Serializable { self =>
     }
 
   /**
+    * Allows to flatten component type
+    * when [[A]] =:= [[B]] in context [[F]]
+    * */
+  def flatten[B](implicit ev: A <:< F[B], F: FlatMap[F]): CakeT.Aux[F, B, Dependencies] =
+    new CakeT[F, B] {
+      type Dependencies = self.Dependencies
+
+      def bake(deps: Dependencies): F[B] = F.flatMap(self.bake(deps))(ev)
+    }
+
+  /**
     * Dependent version of [[flatMap]]
     * allowing to chain several components into one cake
     * accumulating both [[self.Dependencies]] and [[D1]]
@@ -404,6 +416,31 @@ trait CakeT[F[_], A] extends Serializable { self =>
   def recoverNonFatal(thunk: => A)(implicit F: Applicative[F], L: Lifecycle[F]): CakeT.Aux[F, A, self.Dependencies] =
     L.recover(self) { case NonFatal(_) => thunk }
 
+  def withInitialize(implicit initialize: Initialize[F, A], L: Lifecycle[F]): CakeT.Aux[F, A, self.Dependencies] =
+    L.postStartUseF(self)(initialize.initialize)
+
+  def bracketCase[E, B](
+      use: A => F[B]
+  )(release: (A, ExitCase[E]) => F[Unit])(implicit F: Bracket[F, E]): CakeT.Aux[F, B, self.Dependencies] =
+    F.bracketCase(self)(use)(release)
+
+  def bracket[E, B](use: A => F[B])(release: A => F[Unit])(implicit F: Bracket[F, E]): CakeT.Aux[F, B, self.Dependencies] =
+    F.bracket(self)(use)(release)
+
+  def uncancelable[E](implicit F: Applicative[F], B: Bracket[F, E]): CakeT.Aux[F, A, self.Dependencies] =
+    B.uncancelable[A](self)
+
+  def guarantee[E](finalizer: F[Unit])(implicit F: Applicative[F], B: Bracket[F, E]): CakeT.Aux[F, A, self.Dependencies] =
+    B.guarantee(self)(finalizer)
+
+  def guaranteeCase[E](finalizer: ExitCase[E] => F[Unit])(
+      implicit F: Applicative[F],
+      B: Bracket[F, E]
+  ): CakeT.Aux[F, A, self.Dependencies] =
+    B.guaranteeCase(self)(finalizer)
+
+  def withShutdown[B](use: A => F[B])(implicit shutdown: Shutdown[F, A], B: Bracket[F, Throwable]): CakeT.Aux[F, B, self.Dependencies] =
+    B.bracket[A, B](self)(use)(shutdown.shutdown)
   // INTERNAL
 
   class widenAsDsl[T, Repr](val `gen`: Generic.Aux[T, Repr]) {
@@ -473,7 +510,11 @@ object CakeT {
     * @return  - cake for which `bake` === `f`
     * */
   def ap[F[_], A, D0](f: D0 => A)(implicit F: Applicative[F]): CakeT.Aux[F, A, D0] =
-    apF[F, A, D0](d => F.pure(f(d)))
+    new CakeT[F, A] {
+      type Dependencies = D0
+
+      def bake(deps: D0): F[A] = F.pure(f(deps))
+    }
 
   /**
     * Allows to lift monadic function into Cake.
@@ -484,11 +525,9 @@ object CakeT {
     * @tparam A - component type
     * @tparam D0 - dependency type
     * @param f - monadic allocation function
+    * @param F - monad for F
     * @return  - cake for which `bake`  `f`
     * */
-  def apF[F[_], A, D0](f: D0 => F[A]): CakeT.Aux[F, A, D0] = new CakeT[F, A] {
-    type Dependencies = D0
-
-    def bake(deps: D0): F[A] = f(deps)
-  }
+  def apF[F[_], A, D0](f: D0 => F[A])(implicit F: Monad[F]): CakeT.Aux[F, A, D0] =
+    ap[F, F[A], D0](f).flatten
 }

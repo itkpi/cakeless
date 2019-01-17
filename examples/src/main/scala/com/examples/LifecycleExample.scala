@@ -2,7 +2,6 @@ package com.examples
 
 import java.nio.file.Paths
 import cakeless._
-import cakeless.cats_effect._
 import cats.effect.{ExitCode, IO, IOApp}
 import cats.implicits._
 import scala.concurrent.ExecutionContext

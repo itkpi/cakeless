@@ -1,4 +1,4 @@
-package cakeless.cats_effect
+package cakeless.lifecycle
 
 import cakeless.CakeT
 import cakeless.CakeT.Aux
@@ -10,6 +10,7 @@ import scala.language.higherKinds
   * Copy-pasted definition from [[cats.effect.Bracket]]
   * */
 trait Bracket[F[_], E] {
+
   /**
     * A generalized version of [[bracket]] which uses [[ExitCase]]
     * to distinguish between different exit cases when releasing

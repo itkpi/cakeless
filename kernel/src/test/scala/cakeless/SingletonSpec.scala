@@ -1,9 +1,8 @@
-package cakeless.cats_effect
+package cakeless
 
-import cakeless._
 import cats.effect.IO
 import org.scalatest.FlatSpec
-import shapeless.{::, HNil}
+import shapeless.HNil
 
 class SingletonSpec extends FlatSpec {
   "CakeT.singleton" should "work correctly" in {

@@ -3,7 +3,7 @@ import Dependencies._
 
 lazy val snapshot: Boolean = true
 lazy val v: String = {
-  val vv = "0.2.2"
+  val vv = "0.3.0"
   if (!snapshot) vv
   else vv + "-SNAPSHOT"
 }
@@ -48,16 +48,7 @@ lazy val kernel = sonatypeProject(id = "cakeless", base = file("./kernel"))
         Shapeless.value,
         Cats.core,
         Macros.utils,
-        Testing.mockito
-      )
-    }
-  )
-
-lazy val `cats-effect` = sonatypeProject(id = "cakeless-cats-effect", base = file("./cats-effect"))
-  .dependsOn(kernel)
-  .settings(
-    libraryDependencies ++= {
-      Seq(
+        Testing.mockito,
         Cats.effect
       )
     }
@@ -65,7 +56,7 @@ lazy val `cats-effect` = sonatypeProject(id = "cakeless-cats-effect", base = fil
 
 lazy val examples = project
   .in(file("./examples"))
-  .dependsOn(kernel, `cats-effect`)
+  .dependsOn(kernel)
   .settings(
     name := "examples",
     version := v,
@@ -82,7 +73,7 @@ lazy val examples = project
 lazy val root = project
   .in(file("."))
   .dependsOn(examples)
-  .aggregate(kernel, `cats-effect`)
+  .aggregate(kernel)
   .settings(
     name := "cakeless-root",
     version := v,

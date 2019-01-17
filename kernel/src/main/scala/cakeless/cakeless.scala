@@ -1,7 +1,7 @@
 import scala.language.experimental.macros
 import scala.language.{higherKinds, implicitConversions}
 import cats.Id
-import cakeless.internal.DependencyResolver
+import cakeless.internal.{DependencyResolver, SyncResolver}
 import shapeless.{::, HNil}
 
 package object cakeless {
@@ -99,6 +99,87 @@ package object cakeless {
     * @param constructor - sequence number of constructor whose type signature should be used as dependency type for cake
     * */
   def cakeT[F[_], A](constructor: Int): CakeT[F, A] = macro DependencyResolver.makeCakeT[F, A]
+
+  /**
+    * Entry point for component wiring.
+    * Allows to wrap [[A]] into [[CakeT]]
+    * delaying [[A]] instantiation using context [[F]]
+    * Requires [[cats.effect.Sync]] for context [[F]]
+    *
+    * [[A]] should be:
+    * - abstract class with both constructor parameters and abstract `def`s or `val`s
+    * [[A]] is allowed to have self-type requirements.
+    * Dependencies of [[A]] self-types will be also picked-up
+    *
+    * */
+  def cakeDelayed[F[_], A]: CakeT[F, A] = macro SyncResolver.makeCakeSync0[F, A]
+
+  /**
+    * Entry point for component wiring.
+    * Allows to wrap [[A]] into [[CakeT]]
+    * delaying [[A]] instantiation using context [[F]]
+    * Requires [[cats.effect.Sync]] for context [[F]]
+    *
+    * `constructor` parameter allows to chose appropriate constructor.
+    * If constructor is `0` - primary constructor will be used.
+    * If constructor is `> 0` - constructor will be picked by definition order
+    *
+    * `constructor` is required to be literal value.
+    * Otherwise code won't compile!!!
+    *
+    * [[A]] should be:
+    * - abstract class with both constructor parameters and abstract `def`s or `val`s
+    * [[A]] is allowed to have self-type requirements.
+    * Dependencies of [[A]] self-types will be also picked-up
+    *
+    * @param constructor - sequence number of constructor whose type signature should be used as dependency type for cake
+    * */
+  def cakeDelayed[F[_], A](constructor: Int): CakeT[F, A] = macro SyncResolver.makeCakeSync[F, A]
+
+  /**
+    * Entry point for component wiring.
+    * Allows to wrap [[A]] into [[CakeT]]
+    * delaying [[A]] instantiation using context [[F]]
+    * Requires [[cats.effect.Sync]] for context [[F]].
+    *
+    * Additionally ensures that [[A]] will be singleton component
+    * (which means [[A]] will be allocated exactly once
+    * no matter how much cake depends on it)
+    * Implemented using [[cats.effect.concurrent.Ref]]
+    *
+    * [[A]] should be:
+    * - abstract class with both constructor parameters and abstract `def`s or `val`s
+    * [[A]] is allowed to have self-type requirements.
+    * Dependencies of [[A]] self-types will be also picked-up
+    *
+    * */
+  def cakeSingleton[F[_], A]: CakeT[F, A] = macro SyncResolver.makeCakeSyncSingleton0[F, A]
+
+  /**
+    * Entry point for component wiring.
+    * Allows to wrap [[A]] into [[CakeT]]
+    * delaying [[A]] instantiation using context [[F]]
+    * Requires [[cats.effect.Sync]] for context [[F]].
+    *
+    * Additionally ensures that [[A]] will be singleton component
+    * (which means [[A]] will be allocated exactly once
+    * no matter how much cake depends on it)
+    * Implemented using [[cats.effect.concurrent.Ref]]
+    *
+    * `constructor` parameter allows to chose appropriate constructor.
+    * If constructor is `0` - primary constructor will be used.
+    * If constructor is `> 0` - constructor will be picked by definition order
+    *
+    * `constructor` is required to be literal value.
+    * Otherwise code won't compile!!!
+    *
+    * [[A]] should be:
+    * - abstract class with both constructor parameters and abstract `def`s or `val`s
+    * [[A]] is allowed to have self-type requirements.
+    * Dependencies of [[A]] self-types will be also picked-up
+    *
+    * */
+  def cakeSingleton[F[_], A](constructor: Int): CakeT[F, A] = macro SyncResolver.makeCakeSyncSingleton[F, A]
 
   /**
     * Implicit conversion used to drop [[HNil]] from the dependency type

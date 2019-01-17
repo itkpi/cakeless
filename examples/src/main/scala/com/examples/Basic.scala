@@ -1,11 +1,11 @@
 package com.examples
 
 import cats.implicits._
+import cakeless._
 import cats.data.WriterT
 import cats.effect.{ExitCode, IO, IOApp}
 import java.nio.file.{Path, Paths}
 import scala.concurrent.ExecutionContext
-import cakeless.cats_effect._
 import cakeless.tagging._
 
 object Basic extends IOApp {

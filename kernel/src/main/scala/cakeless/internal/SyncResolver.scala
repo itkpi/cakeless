@@ -1,9 +1,8 @@
-package cakeless.cats_effect
+package cakeless.internal
 
-import cakeless.internal.DependencyResolver
-import scala.reflect.macros.whitebox
 import scala.language.experimental.macros
 import scala.language.higherKinds
+import scala.reflect.macros.whitebox
 
 /**
   * Whitebox-macro magic
