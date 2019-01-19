@@ -1,7 +1,7 @@
 import xerial.sbt.Sonatype._
 import Dependencies._
 
-lazy val snapshot: Boolean = true
+lazy val snapshot: Boolean = false
 lazy val v: String = {
   val vv = "0.3.0"
   if (!snapshot) vv
@@ -27,10 +27,8 @@ def sonatypeProject(id: String, base: File) =
       crossScalaVersions := Seq(`scala-2-11`, `scala-2-12`),
       publishTo := {
         val nexus = "https://oss.sonatype.org/"
-        if (isSnapshot.value)
-          Some("snapshots" at nexus + "content/repositories/snapshots")
-        else
-          Some("releases" at nexus + "service/local/staging/deploy/maven2")
+        if (isSnapshot.value) Some("snapshots" at nexus + "content/repositories/snapshots")
+        else Some("releases" at nexus + "service/local/staging/deploy/maven2")
       },
       scalacOptions ++= Seq("-Ypartial-unification", "-feature"),
       resolvers += Resolver.sonatypeRepo("releases"),

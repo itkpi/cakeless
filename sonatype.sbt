@@ -11,13 +11,13 @@ credentials += Credentials(
   "Sonatype Nexus Repository Manager",
   "oss.sonatype.org",
   "vitalii-honta",
-  s"Murcielago@$password"
+  password
 )
 
 sonatypeProfileName := "ua.pp.itkpi"
 
 publishMavenStyle := true
-pgpPassphrase := Some(password.toCharArray)
+// pgpPassphrase := Some(password.toCharArray)
 
 licenses := Seq(
   "APL2" -> url("https://github.com/itkpi/cakeless/blob/master/LICENSE")
@@ -40,5 +40,5 @@ developers := List(
   )
 )
 
-useGpg := true
+useGpg := false
 pgpReadOnly := false
