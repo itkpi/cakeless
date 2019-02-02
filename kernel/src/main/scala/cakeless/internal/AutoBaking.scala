@@ -26,24 +26,23 @@ class AutoBaking(val c: blackbox.Context) extends MacroUtils {
     val A = weakTypeOf[A].dealias
     val D = weakTypeOf[D].dealias
 
-    val cls = enclosingClassBody
-    println(cls)
-//    val usageCode = cls.find(_.symbol.typeSignature.dealias <:< A).get
-    val members = cls
-//      .filterNot(_.toString().contains(usageCode))
+    val members = enclosingClassBody
       .collect {
         case valDef: ValDef if !valDef.toString().contains("cake[") && !valDef.toString().contains("auto") => valDef
       }
       .map(c.typecheck(_))
       .filterNot(_.tpe == null)
+
     val deps = hlistTypes(Nil, D)
 
-    println(s"""
+    ifDebug {
+      println(s"""
                |Attempting to automatically bake CakeT[$F, $A, $D]...
                |defined values: $members
                |types: ${members.map(_.symbol.typeSignature)}
                |deps: $deps
       """.stripMargin)
+    }
 
     val depsWithImpls: List[(Type, Tree)] = for (dep <- deps) yield {
       members.filter(_.symbol.typeSignature =:= dep) match {
@@ -56,16 +55,19 @@ class AutoBaking(val c: blackbox.Context) extends MacroUtils {
       }
     }
 
-//    println(s"wirings: $depsWithImpls")
+    ifDebug {
+      println(s"Wirings:\n\t${depsWithImpls.map { case (dep, impl) => s"dep -> $impl" }.mkString("\n\t")}")
+    }
     val depsHList = c.parse(depsWithImpls.map(_._2).mkString("", " :: ", " :: HNil"))
-//    println(depsHList)
-    val expr = q"""
+    val expr      = q"""
        new _root_.cakeless.internal.AutoBake[$F, $A, $D] {
          import shapeless._
          def apply(cakeT: _root_.cakeless.CakeT.Aux[$F, $A, $D]) = cakeT.bake($depsHList)
        }
      """
-//    println(expr)
+    ifDebug {
+      println(s"Generedated code:\n$expr\n$sep")
+    }
     expr
   }
 
@@ -77,9 +79,11 @@ class AutoBaking(val c: blackbox.Context) extends MacroUtils {
         fail(s"Unknown type of enclosing class: ${e.getClass}")
     }) ++ {
       val DefDef(_, _, _, _, _, body) = c.enclosingDef
-      body.collect {
-        case valDef: ValDef => valDef
-      }
+      body
+        .collect {
+          case valDef: ValDef => valDef
+        }
+        .takeWhile(_.pos.line <= c.enclosingPosition.line)
     }).distinct
 
   private def hlistTypes(acc: List[Type], reminder: Type): List[Type] = reminder match {
@@ -88,4 +92,8 @@ class AutoBaking(val c: blackbox.Context) extends MacroUtils {
       val List(head, tail) = reminder.typeArgs
       hlistTypes(acc :+ head, tail)
   }
+
+  private val debug = sys.env.getOrElse("cakeless_macro_debug", "false").toBoolean
+  private def ifDebug[U](thunk: => U): Unit =
+    if (debug) thunk
 }
