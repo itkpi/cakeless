@@ -1,12 +1,13 @@
 package cakeless
 
-import cakeless.internal.{UnUnion, Union}
+import cakeless.internal.{AutoBake, UnUnion, Union}
 import cakeless.lifecycle.{Bracket, Initialize, Lifecycle, Shutdown}
 import cats.data.{ReaderT, WriterT}
 import cats.effect.ExitCase
 import cats.kernel.Monoid
 import cats.{~>, Applicative, FlatMap, Functor, Monad}
 import shapeless.{Generic, HNil, Nat}
+
 import scala.language.higherKinds
 import scala.util.control.NonFatal
 
@@ -56,6 +57,15 @@ trait CakeT[F[_], A] extends Serializable { self =>
     * [[bake]] for cases when [[Dependencies]] is zero-length HList.
     * */
   def baked(implicit ev: HNil =:= Dependencies): F[A] = bake(HNil)
+
+  /**
+    * Automatically pick-up dependencies from the call-site scope
+    * and bake this cake!
+    *
+    * @see [[AutoBake]] for type class
+    * @see [[cakeless.internal.AutoBaking]] for implementation
+    * */
+  def auto(implicit autoBake: AutoBake[F, A, Dependencies]): F[A] = autoBake(self)
 
   /**
     * Allows to convert [[Dependencies]] type into a case class

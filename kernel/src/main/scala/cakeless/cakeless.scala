@@ -181,6 +181,8 @@ package object cakeless {
     * */
   def cakeSingleton[F[_], A](constructor: Int): CakeT[F, A] = macro SyncResolver.makeCakeSyncSingleton[F, A]
 
+
+
   /**
     * Implicit conversion used to drop [[HNil]] from the dependency type
     * when cake's dependency type is [[shapeless.HList]] with single value.
