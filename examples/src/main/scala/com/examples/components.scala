@@ -46,7 +46,7 @@ class ConnectionFailureException(msg: String) extends Exception(msg)
 
 class Database[F[_]](implicit F: MonadError[F, Throwable]) {
   def openConnection(): F[Unit] =
-    if (scala.util.Random.nextInt(10) <= 7) F.raiseError(new ConnectionFailureException("Unable to open connection to DB..."))
+    if (true) F.raiseError(new ConnectionFailureException("Unable to open connection to DB..."))
     else F.pure(println("Opened connection to database!"))
 
   def close(): F[Unit] = F.pure(println("Closed connenction with DB!"))

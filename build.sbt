@@ -15,7 +15,6 @@ lazy val scalaReflect = Def.setting {
 organization in ThisBuild := "ua.pp.itkpi"
 
 val `scala-2-12` = "2.12.8"
-val `scala-2-11` = "2.11.12"
 
 def sonatypeProject(id: String, base: File) =
   Project(id, base)
@@ -24,7 +23,6 @@ def sonatypeProject(id: String, base: File) =
       isSnapshot := snapshot,
       version := v,
       scalaVersion := `scala-2-12`,
-      crossScalaVersions := Seq(`scala-2-11`, `scala-2-12`),
       publishTo := {
         val nexus = "https://oss.sonatype.org/"
         if (isSnapshot.value) Some("snapshots" at nexus + "content/repositories/snapshots")
@@ -39,27 +37,48 @@ def sonatypeProject(id: String, base: File) =
       )
     )
 
-lazy val kernel = sonatypeProject(id = "cakeless", base = file("./kernel"))
+lazy val kernel = sonatypeProject(id = "cakeless-kernel", base = file("./kernel"))
   .settings(
     libraryDependencies ++= {
       Seq(
         Shapeless.value,
-        Cats.core,
-        Macros.utils,
-        Testing.mockito,
-        Cats.effect
+        Macros.utils
       )
     }
   )
 
-lazy val examples = project
-  .in(file("./examples"))
+lazy val cakelessCats = sonatypeProject(id = "cakeless-cats", base = file("./cats"))
   .dependsOn(kernel)
+  .settings(
+    libraryDependencies ++= {
+      Seq(
+        Cats.core,
+        Cats.effect,
+        Macros.utils,
+        Testing.mockito
+      )
+    }
+  )
+
+lazy val cakelessZio = sonatypeProject(id = "cakeless-zio", base = file("./zio"))
+  .dependsOn(kernel)
+  .settings(
+    libraryDependencies ++= {
+      Seq(
+        Scalaz.zio,
+        Macros.utils,
+        Testing.mockito
+      )
+    }
+  )
+
+lazy val examplesCats = project
+  .in(file("./examples"))
+  .dependsOn(kernel, cakelessCats)
   .settings(
     name := "examples",
     version := v,
     scalaVersion := `scala-2-12`,
-    crossScalaVersions := Seq(`scala-2-11`, `scala-2-12`),
     scalacOptions += "-Ypartial-unification",
     addCompilerPlugin("org.spire-math" %% "kind-projector" % "0.9.8"),
     libraryDependencies ++= Seq(
@@ -70,13 +89,12 @@ lazy val examples = project
 
 lazy val root = project
   .in(file("."))
-  .dependsOn(examples)
-  .aggregate(kernel)
+  .dependsOn(examplesCats)
+  .aggregate(kernel, cakelessZio, cakelessCats)
   .settings(
     name := "cakeless-root",
     version := v,
     scalaVersion := `scala-2-12`,
-    crossScalaVersions := Seq(`scala-2-11`, `scala-2-12`),
     scalacOptions += "-Ypartial-unification",
     isSnapshot := snapshot,
     skip in publish := true,

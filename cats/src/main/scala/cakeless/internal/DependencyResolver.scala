@@ -1,10 +1,10 @@
 package cakeless.internal
 
-import scala.language.higherKinds
-import scala.language.experimental.macros
-import shapeless._
-import scala.reflect.macros.whitebox
 import japgolly.microlibs.macro_utils.MacroUtils
+import shapeless._
+import scala.language.experimental.macros
+import scala.language.higherKinds
+import scala.reflect.macros.whitebox
 
 /**
   * Whitebox-macro magic
@@ -86,7 +86,7 @@ class DependencyResolver(val c: whitebox.Context) extends MacroUtils {
 
     q"""
        new cakeless.Cake[$A] {
-         type Dependencies = $depsType
+         final type Dependencies = $depsType
          def bake($depsValueName: $depsType): $A = new $mainType(...$passConstructorParams) with ..$typeRefinements { ..$assignments }
        }"""
   }

@@ -1,10 +1,8 @@
 package com.examples
 
 import java.nio.file.{Path, Paths}
-
 import cakeless._
 import cakeless.tagging._
-
 import scala.concurrent.{Await, ExecutionContext}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.Duration

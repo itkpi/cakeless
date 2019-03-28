@@ -1,136 +1,63 @@
 package cakeless
 
-import cakeless.internal.{AutoBake, UnUnion, Union}
+import cakeless.internal.{AutoBake, CakeTBase, UnUnion, Union}
 import cakeless.lifecycle.{Bracket, Initialize, Lifecycle, Shutdown}
+import cats.{~>, Applicative, FlatMap, Functor, Monad, Monoid}
 import cats.data.{ReaderT, WriterT}
 import cats.effect.ExitCase
-import cats.kernel.Monoid
-import cats.{~>, Applicative, FlatMap, Functor, Monad}
 import shapeless.{Generic, HNil, Nat}
 
 import scala.language.higherKinds
 import scala.util.control.NonFatal
 
-/**
-  * CakeT is monad for cake-pattern.
-  * It is better version of classic Reader monad.
-  *
-  * Classic Reader monad is functional Dependency Injection pattern
-  * allowing to define computation depending on some values that will be provided later
-  * (typically in `main` method).
-  * But its `flatMap` method allows to pass only Reader with same dependency type.
-  *
-  * Unlike classic Reader, CakeT allows to accumulate dependencies in `flatMap` monad.
-  * `flatMap` takes CakeT with different dependency type.
-  * `flatMap` resulting type is `Union` type of both `self.Dependency` and `that.Dependency`
-  * - if `self` and `that` have same dependencies - CakeT will behave like classic Reader
-  * - if `self` and `that` have different dependencies - resulting CakeT will have dependency type
-  *   which is (`self.Dependency` ∪ `that.Dependency`)
-  *
-  * Dependencies are picked up by special macro on the type level.
-  * By default they are represented as `shapeless.HList`.
-  * User is allowed to transform the dependency using `comap` (typical Co-functor operation).
-  * User is also allowed to transform the dependency into `case class` using `shapeless.Generic`
-  *
-  * @see https://medium.com/@itseranga/scala-cake-pattern-e0cd894dae4e for cake-pattern example
-  * @see http://eed3si9n.com/herding-cats/Reader.html for reader monad example
-  * @tparam F - Cake wiring context
-  * @tparam A - cake component type
-  * */
-trait CakeT[F[_], A] extends Serializable { self =>
+trait CakeT[F[_], A] extends CakeTBase[F, A] { self =>
 
   /**
-    * CakeT dependent type which is picked on the type level by whitebox macro.
-    * Typically is `shapeless.HList`
-    * */
-  type Dependencies
-
-  /**
-    * `bake` method is used to provide the dependencies and instantiate [[A]] component within [[F]] context
+    * Allows to convert [[self.Dependencies]] type into a case class
     *
-    * @param deps - dependencies
-    * @return - wired component in [[F]] context
-    * */
-  def bake(deps: Dependencies): F[A]
-
-  /**
-    * [[bake]] for cases when [[Dependencies]] is zero-length HList.
-    * */
-  def baked(implicit ev: HNil =:= Dependencies): F[A] = bake(HNil)
-
-  /**
-    * Automatically pick-up dependencies from the call-site scope
-    * and bake this cake!
-    *
-    * @see [[AutoBake]] for type class
-    * @see [[cakeless.internal.AutoBaking]] for implementation
-    * */
-  def auto(implicit autoBake: AutoBake[F, A, Dependencies]): F[A] = autoBake(self)
-
-  /**
-    * Allows to convert [[Dependencies]] type into a case class
-    *
-    * @tparam R - typically case class whose generic representation is [[Dependencies]]
+    * @tparam R - typically case class whose generic representation is [[self.Dependencies]]
     * @param gen - `shapeless.Generic`
     * @param F - functor for [[F]] context
     * @return - same component with Dependencies as [[R]]
     * */
-  def as[R](implicit gen: Generic.Aux[R, Dependencies], F: Functor[F]): CakeT.Aux[F, A, R] =
+  def as[R](implicit gen: Generic.Aux[R, self.Dependencies], F: Functor[F]): CakeT.Aux[F, A, R] =
     comap[R](gen.to)
 
   /**
-    * Allows to convert [[Dependencies]] type into a case class
-    * in cases when [[R]] generic representation is more specific than [[Dependencies]]
-    * Should be used in cases when:
-    * - [[R]] is subtype of [[Dependencies]]
-    *
-    * Practical case:
-    * - [[A]] component is library code which can't be updated
-    * - [[Dependencies]] contains plain types (untagged)
-    * - [[R]] generic representation contains tagged types.
-    *
-    * @tparam R - case class
-    * @param gen - `shapeless.Generic`
-    * @return - dsl for widening (workaround for path-dependent types)
-    * */
-  def asR[R](implicit gen: Generic[R]): widenAsDsl[R, gen.Repr] =
-    new widenAsDsl[R, gen.Repr](gen)
-
-  /**
     * Typical co-functor operation
-    * allowing to change [[Dependencies]] type for this cake.
+    * allowing to change [[self.Dependencies]] type for this cake.
     *
-    * For instance, you may want to make [[Dependencies]] less wide
+    * For instance, you may want to make [[self.Dependencies]] less wide
     * flattening dependencies with some already known values.
     *
     * @tparam D2 - new dependency type
     * @param f - transformation function
     * @return - cake for same component with updated dependency type
     * */
-  def comap[D2](f: D2 => Dependencies): CakeT.Aux[F, A, D2] =
+  def comap[D2](f: D2 => self.Dependencies): CakeT.Aux[F, A, D2] =
     new CakeT[F, A] {
       type Dependencies = D2
 
-      def bake(deps: D2): F[A] = self.bake(f(deps))
+      def bake(deps: Dependencies): F[A] = self.bake(f(deps))
     }
 
   /**
     * [[comap]] like operation
-    * allowing to change [[Dependencies]] type for this cake
+    * allowing to change [[self.Dependencies]] type for this cake
     * using monadic transformation function
     *
-    * For instance, you may want to make [[Dependencies]] less wide
+    * For instance, you may want to make [[self.Dependencies]] less wide
     * flattening dependencies with some already known values.
     *
     * @tparam D2 - new dependency type
     * @param f - monadic transformation function
     * @return - cake for same component with updated dependency type
     * */
-  def comapM[D2](f: D2 => F[Dependencies])(implicit F: FlatMap[F]): CakeT.Aux[F, A, D2] =
+  def comapM[D2](f: D2 => F[self.Dependencies])(implicit F: FlatMap[F]): CakeT.Aux[F, A, D2] =
     new CakeT[F, A] {
       type Dependencies = D2
 
-      def bake(deps: D2): F[A] = F.flatMap(f(deps))(self.bake)
+      def bake(deps: Dependencies): F[A] = F.flatMap(f(deps))(self.bake)
     }
 
   /**
@@ -142,11 +69,11 @@ trait CakeT[F[_], A] extends Serializable { self =>
     * @param F - functor for [[F]] context
     * @return - cake for [[B]] component with same dependencies
     * */
-  def map[B](f: A => B)(implicit F: Functor[F]): CakeT.Aux[F, B, Dependencies] =
+  def map[B](f: A => B)(implicit F: Functor[F]): CakeT.Aux[F, B, self.Dependencies] =
     new CakeT[F, B] {
       type Dependencies = self.Dependencies
 
-      def bake(deps: self.Dependencies): F[B] = F.map(self bake deps)(f)
+      def bake(deps: Dependencies): F[B] = F.map(self bake deps)(f)
     }
 
   /**
@@ -161,24 +88,24 @@ trait CakeT[F[_], A] extends Serializable { self =>
     * @param F - functor for [[F]] context
     * @return - cake for [[B]] component with new dependencies [[D2]]
     * */
-  def bimap[D2, B](f: D2 => Dependencies, g: A => B)(implicit F: Functor[F]): CakeT.Aux[F, B, D2] =
+  def bimap[D2, B](f: D2 => self.Dependencies, g: A => B)(implicit F: Functor[F]): CakeT.Aux[F, B, D2] =
     comap(f).map(g)
 
   /**
     * Dependent map operation
     * allowing to transform wired component
-    * using also [[Dependencies]] which will be provided later
+    * using also [[self.Dependencies]] which will be provided later
     *
     * @tparam B - new component type
     * @param f - transformation function
     * @param F - functor for [[F]] context
     * @return - cake for [[B]] component with same dependencies
     * */
-  def depMap[B](f: (Dependencies, A) => B)(implicit F: Functor[F]): CakeT.Aux[F, B, Dependencies] =
+  def depMap[B](f: (self.Dependencies, A) => B)(implicit F: Functor[F]): CakeT.Aux[F, B, self.Dependencies] =
     new CakeT[F, B] {
       type Dependencies = self.Dependencies
 
-      def bake(deps: self.Dependencies): F[B] = F.map(self bake deps)(f(deps, _))
+      def bake(deps: Dependencies): F[B] = F.map(self bake deps)(f(deps, _))
     }
 
   /**
@@ -219,7 +146,7 @@ trait CakeT[F[_], A] extends Serializable { self =>
     * Allows to flatten component type
     * when [[A]] =:= [[B]] in context [[F]]
     * */
-  def flatten[B](implicit ev: A <:< F[B], F: FlatMap[F]): CakeT.Aux[F, B, Dependencies] =
+  def flatten[B](implicit ev: A <:< F[B], F: FlatMap[F]): CakeT.Aux[F, B, self.Dependencies] =
     new CakeT[F, B] {
       type Dependencies = self.Dependencies
 
@@ -231,7 +158,7 @@ trait CakeT[F[_], A] extends Serializable { self =>
     * allowing to chain several components into one cake
     * accumulating both [[self.Dependencies]] and [[D1]]
     * into new dependency [[Out]]
-    * using also [[Dependencies]] which will be provided later.
+    * using also [[self.Dependencies]] which will be provided later.
     *
     * For union type [[Out]] the following holds:
     *
@@ -247,7 +174,7 @@ trait CakeT[F[_], A] extends Serializable { self =>
     * @return - cake for [[B]] component with new dependencies [[Out]]
     * */
   def depFlatMap[B, D1, Out, AL <: Nat](
-      f: (Dependencies, A) => CakeT.Aux[F, B, D1]
+      f: (self.Dependencies, A) => CakeT.Aux[F, B, D1]
   )(implicit union: Union.Aux[self.Dependencies, D1, Out],
     unUnion: UnUnion[self.Dependencies, D1, Out],
     F: FlatMap[F]): CakeT.Aux[F, B, Out] =
@@ -272,7 +199,7 @@ trait CakeT[F[_], A] extends Serializable { self =>
     * @param F - monad for [[F]] context
     * @return - cake for [[B]] component with same dependencies
     * */
-  def mapM[B](f: A => F[B])(implicit F: Monad[F]): CakeT.Aux[F, B, Dependencies] =
+  def mapM[B](f: A => F[B])(implicit F: Monad[F]): CakeT.Aux[F, B, self.Dependencies] =
     new CakeT[F, B] {
       type Dependencies = self.Dependencies
 
@@ -301,7 +228,7 @@ trait CakeT[F[_], A] extends Serializable { self =>
     * @see [[cats.data.ReaderT]]
     * @return - reader monad
     * */
-  def toReader: ReaderT[F, Dependencies, A] = ReaderT[F, Dependencies, A](bake)
+  def toReader: ReaderT[F, self.Dependencies, A] = ReaderT[F, self.Dependencies, A](self.bake)
 
   /**
     * Wraps existing [[F]] context into [[WriterT]] monad
@@ -316,7 +243,7 @@ trait CakeT[F[_], A] extends Serializable { self =>
     * @param F - applicative functor for context [[F]]
     * @return - same cake in context `WriterT[F, L, ?}`
     * */
-  def logged[L: Monoid](logRecord: L)(implicit F: Applicative[F]): CakeT.Aux[WriterT[F, L, ?], A, Dependencies] =
+  def logged[L: Monoid](logRecord: L)(implicit F: Applicative[F]): CakeT.Aux[WriterT[F, L, ?], A, self.Dependencies] =
     new CakeT[WriterT[F, L, ?], A] {
       type Dependencies = self.Dependencies
       def bake(deps: Dependencies): WriterT[F, L, A] = WriterT.liftF(self bake deps).tell(logRecord)
@@ -338,7 +265,7 @@ trait CakeT[F[_], A] extends Serializable { self =>
     *
     * @see [[Lifecycle.preStartF]]
     * */
-  def preStartF(thunk: => F[Unit])(implicit L: Lifecycle[F]): CakeT.Aux[F, A, self.Dependencies] =
+  def preStartF(thunk: => F[Unit])(implicit L: Lifecycle[F, CakeT]): CakeT.Aux[F, A, self.Dependencies] =
     L.preStartF(self)(thunk)
 
   /**
@@ -346,7 +273,7 @@ trait CakeT[F[_], A] extends Serializable { self =>
     *
     * @see [[Lifecycle.preStart]]
     * */
-  def preStart(thunk: => Unit)(implicit F: Applicative[F], L: Lifecycle[F]): CakeT.Aux[F, A, self.Dependencies] =
+  def preStart(thunk: => Unit)(implicit L: Lifecycle[F, CakeT]): CakeT.Aux[F, A, self.Dependencies] =
     L.preStart(self)(thunk)
 
   /**
@@ -354,7 +281,7 @@ trait CakeT[F[_], A] extends Serializable { self =>
     *
     * @see [[Lifecycle.postStartF]]
     * */
-  def postStartF(thunk: => F[Unit])(implicit L: Lifecycle[F]): CakeT.Aux[F, A, self.Dependencies] =
+  def postStartF(thunk: => F[Unit])(implicit L: Lifecycle[F, CakeT]): CakeT.Aux[F, A, self.Dependencies] =
     L.postStartF(self)(thunk)
 
   /**
@@ -362,7 +289,7 @@ trait CakeT[F[_], A] extends Serializable { self =>
     *
     * @see [[Lifecycle.postStart]]
     * */
-  def postStart(thunk: => Unit)(implicit F: Applicative[F], L: Lifecycle[F]): CakeT.Aux[F, A, self.Dependencies] =
+  def postStart(thunk: => Unit)(implicit L: Lifecycle[F, CakeT]): CakeT.Aux[F, A, self.Dependencies] =
     L.postStart(self)(thunk)
 
   /**
@@ -370,7 +297,7 @@ trait CakeT[F[_], A] extends Serializable { self =>
     *
     * @see [[Lifecycle.postStartUseF]]
     * */
-  def postStartUseF(use: A => F[Unit])(implicit L: Lifecycle[F]): CakeT.Aux[F, A, self.Dependencies] =
+  def postStartUseF(use: A => F[Unit])(implicit L: Lifecycle[F, CakeT]): CakeT.Aux[F, A, self.Dependencies] =
     L.postStartUseF(self)(use)
 
   /**
@@ -378,7 +305,7 @@ trait CakeT[F[_], A] extends Serializable { self =>
     *
     * @see [[Lifecycle.postStartUse]]
     * */
-  def postStartUse(use: A => Unit)(implicit F: Applicative[F], L: Lifecycle[F]): CakeT.Aux[F, A, self.Dependencies] =
+  def postStartUse(use: A => Unit)(implicit L: Lifecycle[F, CakeT]): CakeT.Aux[F, A, self.Dependencies] =
     L.postStartUse(self)(use)
 
   /**
@@ -386,7 +313,7 @@ trait CakeT[F[_], A] extends Serializable { self =>
     *
     * @see [[Lifecycle.handleErrorWith]]
     * */
-  def handleErrorWith(f: Throwable => F[A])(implicit L: Lifecycle[F]): CakeT.Aux[F, A, self.Dependencies] =
+  def handleErrorWith(f: Throwable => F[A])(implicit L: Lifecycle[F, CakeT]): CakeT.Aux[F, A, self.Dependencies] =
     L.handleErrorWith(self)(f)
 
   /**
@@ -394,7 +321,7 @@ trait CakeT[F[_], A] extends Serializable { self =>
     *
     * @see [[Lifecycle.handleError]]
     * */
-  def handleError(f: Throwable => A)(implicit F: Applicative[F], L: Lifecycle[F]): CakeT.Aux[F, A, self.Dependencies] =
+  def handleError(f: Throwable => A)(implicit L: Lifecycle[F, CakeT]): CakeT.Aux[F, A, self.Dependencies] =
     L.handleError(self)(f)
 
   /**
@@ -402,7 +329,7 @@ trait CakeT[F[_], A] extends Serializable { self =>
     *
     * @see [[Lifecycle.recoverWith]]
     * */
-  def recoverWith(f: PartialFunction[Throwable, F[A]])(implicit L: Lifecycle[F]): CakeT.Aux[F, A, self.Dependencies] =
+  def recoverWith(f: PartialFunction[Throwable, F[A]])(implicit L: Lifecycle[F, CakeT]): CakeT.Aux[F, A, self.Dependencies] =
     L.recoverWith(self)(f)
 
   /**
@@ -410,7 +337,7 @@ trait CakeT[F[_], A] extends Serializable { self =>
     *
     * @see [[Lifecycle.recover]]
     * */
-  def recover(f: PartialFunction[Throwable, A])(implicit F: Applicative[F], L: Lifecycle[F]): CakeT.Aux[F, A, self.Dependencies] =
+  def recover(f: PartialFunction[Throwable, A])(implicit L: Lifecycle[F, CakeT]): CakeT.Aux[F, A, self.Dependencies] =
     L.recover(self)(f)
 
   /**
@@ -423,10 +350,10 @@ trait CakeT[F[_], A] extends Serializable { self =>
     * @param L - lifecycle control for context [[F]]
     * @return - same cake with new component provided
     * */
-  def recoverNonFatal(thunk: => A)(implicit F: Applicative[F], L: Lifecycle[F]): CakeT.Aux[F, A, self.Dependencies] =
+  def recoverNonFatal(thunk: => A)(implicit L: Lifecycle[F, CakeT]): CakeT.Aux[F, A, self.Dependencies] =
     L.recover(self) { case NonFatal(_) => thunk }
 
-  def withInitialize(implicit initialize: Initialize[F, A], L: Lifecycle[F]): CakeT.Aux[F, A, self.Dependencies] =
+  def withInitialize(implicit initialize: Initialize[F, A], L: Lifecycle[F, CakeT]): CakeT.Aux[F, A, self.Dependencies] =
     L.postStartUseF(self)(initialize.initialize)
 
   def bracketCase[E, B](
@@ -451,12 +378,6 @@ trait CakeT[F[_], A] extends Serializable { self =>
 
   def withShutdown[B](use: A => F[B])(implicit shutdown: Shutdown[F, A], B: Bracket[F, Throwable]): CakeT.Aux[F, B, self.Dependencies] =
     B.bracket[A, B](self)(use)(shutdown.shutdown)
-  // INTERNAL
-
-  class widenAsDsl[T, Repr](val `gen`: Generic.Aux[T, Repr]) {
-    def widen(implicit ev: Repr <:< Dependencies): CakeT.Aux[F, A, T] =
-      comap[T](r => ev(`gen`.to(r)))
-  }
 }
 
 object CakeT {
@@ -504,7 +425,7 @@ object CakeT {
   def id[F[_], D0](implicit F: Applicative[F]): CakeT.Aux[F, D0, D0] = new CakeT[F, D0] {
     type Dependencies = D0
 
-    def bake(deps: D0): F[D0] = F.pure(deps)
+    def bake(deps: Dependencies): F[D0] = F.pure(deps)
   }
 
   /**
@@ -523,7 +444,7 @@ object CakeT {
     new CakeT[F, A] {
       type Dependencies = D0
 
-      def bake(deps: D0): F[A] = F.pure(f(deps))
+      def bake(deps: Dependencies): F[A] = F.pure(f(deps))
     }
 
   /**

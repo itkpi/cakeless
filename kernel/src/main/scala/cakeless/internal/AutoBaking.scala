@@ -1,23 +1,19 @@
 package cakeless.internal
 
-import cakeless.CakeT
-
-import scala.language.higherKinds
-import scala.language.experimental.macros
-import scala.reflect.macros.{blackbox, TypecheckException}
 import japgolly.microlibs.macro_utils.MacroUtils
 import shapeless.HNil
+import scala.language.experimental.macros
+import scala.language.higherKinds
+import scala.reflect.macros.{blackbox, TypecheckException}
 
 trait AutoBake[F[_], A, D] {
-  def apply(cakeT: CakeT.Aux[F, A, D]): F[A]
+  def apply(cakeT: CakeTBase[F, A] { type Dependencies = D }): F[A]
 }
 
-object AutoBake {
-  implicit def materialize[F[_], A, D]: AutoBake[F, A, D] = macro AutoBaking.autoBakeImpl[F, A, D]
-}
-
-class AutoBaking(val c: blackbox.Context) extends MacroUtils {
+abstract class AutoBaking(val c: blackbox.Context) extends MacroUtils {
   import c.universe._
+
+  def cakeImpl: Type
 
   private val hnil = typeOf[HNil].dealias
 
@@ -37,7 +33,7 @@ class AutoBaking(val c: blackbox.Context) extends MacroUtils {
 
     ifDebug {
       println(s"""
-               |Attempting to automatically bake CakeT[$F, $A, $D]...
+               |Attempting to automatically bake $cakeImpl[$F, $A, $D]...
                |defined values: $members
                |types: ${members.map(_.symbol.typeSignature)}
                |deps: $deps
@@ -62,7 +58,7 @@ class AutoBaking(val c: blackbox.Context) extends MacroUtils {
     val expr      = q"""
        new _root_.cakeless.internal.AutoBake[$F, $A, $D] {
          import shapeless._
-         def apply(cakeT: _root_.cakeless.CakeT.Aux[$F, $A, $D]) = cakeT.bake($depsHList)
+         def apply(cakeT: _root_.cakeless.internal.CakeTBase[$F, $A] { type Dependencies = $D }) = cakeT.bake($depsHList)
        }
      """
     ifDebug {

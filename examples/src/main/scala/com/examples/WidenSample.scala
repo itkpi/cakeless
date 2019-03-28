@@ -27,9 +27,7 @@ object WidenSample extends App {
 
   val baseCake: Cake.Aux[Comp2 with Comp1, Base]          = cake[Comp2 with Comp1]
   val sample: Cake.Aux[Comp2 with Comp1, Concrete]        = baseCake.widen
-  val sample2: Cake.Aux[Comp2 with Comp1, ConcreteWiring] = baseCake.asR[ConcreteWiring].widen
 
   println(baseCake.bake(1 :: "BASE CAKE" :: HNil).xy)
   println(sample.bake(1.tagged[y] :: "WIDEN CAKE".tagged[x] :: HNil).xy)
-  println(sample2.bake(ConcreteWiring(1.tagged[y], "WIDEN CASE CLASS CAKE".tagged[x])).xy)
 }

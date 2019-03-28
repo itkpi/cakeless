@@ -1,7 +1,6 @@
 package cakeless.lifecycle
 
 import cakeless.CakeT
-import cakeless.CakeT.Aux
 import cats.Applicative
 import cats.effect.ExitCase
 import scala.language.higherKinds
@@ -100,7 +99,7 @@ trait LowPriorityBracket {
   implicit def fromCatsEffect[F[_], E](implicit F: CEBracket[F, E]): Bracket[F, E] = new Bracket[F, E] {
     def bracketCase[A, B](acquire: CakeT[F, A])(use: A => F[B])(
         release: (A, ExitCase[E]) => F[Unit]
-    ): Aux[F, B, acquire.Dependencies] = new CakeT[F, B] {
+    ): CakeT.Aux[F, B, acquire.Dependencies] = new CakeT[F, B] {
       type Dependencies = acquire.Dependencies
       def bake(deps: acquire.Dependencies): F[B] =
         F.bracketCase[A, B](acquire = acquire bake deps)(use)(release)
