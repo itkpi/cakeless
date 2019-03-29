@@ -8,6 +8,8 @@ object Dependencies {
   val typesafeConfigV = "1.3.3"
   val mockitoV        = "2.23.4"
   val macroUtilV      = "1.18"
+  val zioV            = "0.19"
+  val simulacrumV     = "0.15.0"
 
   object Shapeless {
     val value = "com.chuusai" %% "shapeless" % shapelessV withSources ()
@@ -16,6 +18,10 @@ object Dependencies {
   object Cats {
     val core   = "org.typelevel" %% "cats-core"   % catsV withSources ()
     val effect = "org.typelevel" %% "cats-effect" % catsEffectV
+  }
+
+  object Scalaz {
+    val zio = "org.scalaz" %% "scalaz-zio" % zioV
   }
 
   object Testing {
@@ -29,6 +35,7 @@ object Dependencies {
   }
 
   object Macros {
-    val utils = "com.github.japgolly.microlibs" %% "macro-utils" % macroUtilV withSources ()
+    val utils      = "com.github.japgolly.microlibs" %% "macro-utils" % macroUtilV withSources ()
+    val simulacrum = "com.github.mpilquist"          %% "simulacrum"  % simulacrumV withSources ()
   }
 }
