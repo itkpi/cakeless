@@ -1,4 +1,4 @@
-import cakeless.internal.{AutoBake, CakeTAutoBacking, DependencyResolver, SyncResolver}
+import cakeless.internal.{AutoBake, CakeTAutoBacking, DependencyResolver, CatsBasedResolver}
 import cakeless.lifecycle.{CatsLifecycle, LowPriorityInitialize, LowPriorityShutdown}
 import cats.Id
 import shapeless.{::, HNil}
@@ -20,7 +20,7 @@ package object cakeless extends CatsLifecycle with LowPriorityInitialize with Lo
     * [[A]] is allowed to have self-type requirements.
     * Dependencies of [[A]] self-types will be also picked-up
     * */
-  def cake[A]: Cake[A] = macro DependencyResolver.makeCake0[A]
+  def cake[A]: Cake[A] = macro CatsBasedResolver.makeCake0[A]
 
   /**
     * Entry point for component wiring.
@@ -39,7 +39,7 @@ package object cakeless extends CatsLifecycle with LowPriorityInitialize with Lo
     *
     * @param constructor - sequence number of constructor whose type signature should be used as dependency type for cake
     * */
-  def cake[A](constructor: Int): Cake[A] = macro DependencyResolver.makeCake[A]
+  def cake[A](constructor: Int): Cake[A] = macro CatsBasedResolver.makeCake[A]
 
   /**
     * Entry point for component wiring.
@@ -52,7 +52,7 @@ package object cakeless extends CatsLifecycle with LowPriorityInitialize with Lo
     * [[A]] is allowed to have self-type requirements.
     * Dependencies of [[A]] self-types will be also picked-up
     * */
-  def cakeT[F[_], A]: CakeT[F, A] = macro DependencyResolver.makeCakeT0[F, A]
+  def cakeT[F[_], A]: CakeT[F, A] = macro CatsBasedResolver.makeCakeT0[F, A]
 
   /**
     * Entry point for component wiring.
@@ -73,7 +73,7 @@ package object cakeless extends CatsLifecycle with LowPriorityInitialize with Lo
     *
     * @param constructor - sequence number of constructor whose type signature should be used as dependency type for cake
     * */
-  def cakeT[F[_], A](constructor: Int): CakeT[F, A] = macro DependencyResolver.makeCakeT[F, A]
+  def cakeT[F[_], A](constructor: Int): CakeT[F, A] = macro CatsBasedResolver.makeCakeT[F, A]
 
   /**
     * Entry point for component wiring.
@@ -87,7 +87,7 @@ package object cakeless extends CatsLifecycle with LowPriorityInitialize with Lo
     * Dependencies of [[A]] self-types will be also picked-up
     *
     * */
-  def cakeDelayed[F[_], A]: CakeT[F, A] = macro SyncResolver.makeCakeSync0[F, A]
+  def cakeDelayed[F[_], A]: CakeT[F, A] = macro CatsBasedResolver.makeCakeSync0[F, A]
 
   /**
     * Entry point for component wiring.
@@ -109,7 +109,7 @@ package object cakeless extends CatsLifecycle with LowPriorityInitialize with Lo
     *
     * @param constructor - sequence number of constructor whose type signature should be used as dependency type for cake
     * */
-  def cakeDelayed[F[_], A](constructor: Int): CakeT[F, A] = macro SyncResolver.makeCakeSync[F, A]
+  def cakeDelayed[F[_], A](constructor: Int): CakeT[F, A] = macro CatsBasedResolver.makeCakeSync[F, A]
 
   /**
     * Entry point for component wiring.
@@ -128,7 +128,7 @@ package object cakeless extends CatsLifecycle with LowPriorityInitialize with Lo
     * Dependencies of [[A]] self-types will be also picked-up
     *
     * */
-  def cakeSingleton[F[_], A]: CakeT[F, A] = macro SyncResolver.makeCakeSyncSingleton0[F, A]
+  def cakeSingleton[F[_], A]: CakeT[F, A] = macro CatsBasedResolver.makeCakeSyncSingleton0[F, A]
 
   /**
     * Entry point for component wiring.
@@ -154,7 +154,7 @@ package object cakeless extends CatsLifecycle with LowPriorityInitialize with Lo
     * Dependencies of [[A]] self-types will be also picked-up
     *
     * */
-  def cakeSingleton[F[_], A](constructor: Int): CakeT[F, A] = macro SyncResolver.makeCakeSyncSingleton[F, A]
+  def cakeSingleton[F[_], A](constructor: Int): CakeT[F, A] = macro CatsBasedResolver.makeCakeSyncSingleton[F, A]
 
   /**
     * Implicit conversion used to drop [[HNil]] from the dependency type

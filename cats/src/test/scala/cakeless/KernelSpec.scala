@@ -279,7 +279,7 @@ class KernelSpec extends FlatSpec {
   }
 
   "CakeT.pure" should "work correctly" in {
-    val c0 = CakeTBase.pure[Try, Int](1)
+    val c0 = CakeT.pure[Try, Int](1)
 
     val result = c0.baked
 
@@ -288,7 +288,7 @@ class KernelSpec extends FlatSpec {
   }
 
   "CakeT.liftF" should "work correctly" in {
-    val c0 = CakeTBase.liftF[Try, Int](Try { 1 + 1 })
+    val c0 = CakeT.liftF[Try, Int](Try { 1 + 1 })
 
     val result = c0.baked
 
@@ -305,7 +305,7 @@ class KernelSpec extends FlatSpec {
   }
 
   "CakeT.id" should "work correctly" in {
-    val c0 = CakeTBase.id[Try, String]
+    val c0 = CakeT.id[Try, String]
 
     val result = c0.bake("foo")
 
@@ -313,15 +313,8 @@ class KernelSpec extends FlatSpec {
     assert(result.get == "foo")
   }
 
-  "CakeT.asR.wired" should "work correctly" in {
-    val c0 = cake[FooComponent].asR[FooWiringConcrete].widen
-
-    val result = c0.bake(FooWiringConcrete(1.tagged[foo]))
-    assert(result.foo == 1)
-  }
-
   "CakeT.depMap" should "work correctly" in {
-    val c0: Cake.Aux[FooComponent, FooWiringConcrete] = cake[FooComponent].asR[FooWiringConcrete].widen
+    val c0: Cake.Aux[FooComponent, FooWiringConcrete] = cake[FooComponent].comap[FooWiringConcrete](_.foo :: HNil)
     val c1 = c0.depMap { (dep, fooComponent) =>
       s"${dep.foo}=${fooComponent.foo}"
     }
@@ -351,7 +344,7 @@ class KernelSpec extends FlatSpec {
   }
 
   "CakeT.apF" should "work correctly" in {
-    val c0 = CakeTBase.apF[Try, NotCake, Int :: String :: HNil] {
+    val c0 = CakeT.apF[Try, NotCake, Int :: String :: HNil] {
       case a :: b :: HNil =>
         Try(new NotCake(a, b))
     }
@@ -362,7 +355,7 @@ class KernelSpec extends FlatSpec {
   }
 
   "CakeT.ap" should "work correctly" in {
-    val c0 = CakeTBase.ap[Try, NotCake, Int :: String :: HNil] {
+    val c0 = CakeT.ap[Try, NotCake, Int :: String :: HNil] {
       case a :: b :: HNil =>
         new NotCake(a, b)
     }
@@ -383,7 +376,7 @@ class KernelSpec extends FlatSpec {
   }
 
   "CakeT.comapM" should "work correctly" in {
-    val c0: CakeTBase.Aux[Try, FooComponent, Int] = cakeT[Try, FooComponent]
+    val c0: CakeT.Aux[Try, FooComponent, Int] = cakeT[Try, FooComponent]
     val c1 = c0.comapM[String] { str: String =>
       Try(str.toInt)
     }

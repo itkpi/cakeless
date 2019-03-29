@@ -2,6 +2,7 @@ package cakeless.internal
 
 import japgolly.microlibs.macro_utils.MacroUtils
 import shapeless._
+
 import scala.language.experimental.macros
 import scala.language.higherKinds
 import scala.reflect.macros.whitebox
@@ -11,9 +12,19 @@ import scala.reflect.macros.whitebox
   * picking up cake dependencies on the type level
   * and generating wiring code (like macwire does).
   * */
-class DependencyResolver(val c: whitebox.Context) extends MacroUtils {
+abstract class DependencyResolver(val c: whitebox.Context) extends MacroUtils {
 
   import c.universe._
+
+  case class CakeInfo(
+      A: Type,
+      depsType: Tree,
+      depsValueName: TermName,
+      mainType: Type,
+      passConstructorParams: List[List[Tree]],
+      typeRefinements: List[Type],
+      assignments: List[Tree]
+  )
 
   protected val hnil = typeOf[HNil].dealias
 
@@ -40,60 +51,9 @@ class DependencyResolver(val c: whitebox.Context) extends MacroUtils {
     case _                     => tpe :: Nil
   }
 
-  protected def instantiate[A: WeakTypeTag](
-      mainType: Type,
-      constructorParams: List[List[Type]],
-      abstractValues: List[MethodSymbol],
-      depsValueName: TermName,
-      depsType: Tree
-  ): Tree = {
-    val A = weakTypeOf[A].dealias
-
-    val typeRefinements = extractClassesChain(A).filterNot(_ =:= mainType)
-
-    ifDebug {
-      println("Self-types:\n\t" + typeRefinements.mkString("\n\t"))
-      println(sep)
-    }
-
-    val (passConstructorParams, hlistOffset) = constructorParams
-      .foldLeft(List.empty[List[Tree]] -> 0) {
-        case ((paramsAcc, offset), carry) =>
-          val carryAssignments: List[Tree] = carry.indices.map { idx =>
-            c.untypecheck(q"""$depsValueName(${offset + idx})""")
-          }.toList
-          (paramsAcc :+ carryAssignments, offset + carry.size)
-      }
-
-    ifDebug {
-      println(
-        "Constructor params:\n\t" + passConstructorParams.mkString("\n\t")
-      )
-      println(sep)
-    }
-
-    val assignments = {
-      abstractValues.zipWithIndex.map {
-        case (method, idx) =>
-          c.untypecheck(q"override lazy val ${method.name} = $depsValueName(${hlistOffset + idx})")
-      }
-    }
-
-    ifDebug {
-      println("Assignments:\n\t" + assignments.mkString("\n\t"))
-      println(sep)
-    }
-
-    q"""
-       new cakeless.Cake[$A] {
-         final type Dependencies = $depsType
-         def bake($depsValueName: $depsType): $A = new $mainType(...$passConstructorParams) with ..$typeRefinements { ..$assignments }
-       }"""
-  }
-
-  def makeCake0[A: WeakTypeTag]: Tree = makeCake[A](reify(0))
-
-  def makeCake[A: WeakTypeTag](constructor: Expr[Int]): Tree = {
+  protected def getCakeInfo[A: WeakTypeTag](
+      constructor: Expr[Int]
+  ): CakeInfo = {
     val A = weakTypeOf[A].dealias
 
     val constNum: Int = constructor match {
@@ -155,45 +115,43 @@ class DependencyResolver(val c: whitebox.Context) extends MacroUtils {
     }
     val deps = buildHListType(constructorParams.flatMap(_.map(_.typeSignature.dealias)) ++ abstractMembersReturnTypes)
 
-    val expr = instantiate[A](
-      mainType,
-      constructorParams.map(_.map(_.typeSignature.dealias)),
-      abstractValues,
-      TermName("deps"),
-      deps
-    )
+    val typeRefinements = extractClassesChain(A).filterNot(_ =:= mainType)
 
     ifDebug {
-      println(sep)
-      println("Generated code:\n" + expr)
+      println("Self-types:\n\t" + typeRefinements.mkString("\n\t"))
       println(sep)
     }
 
-    expr
-  }
+    val depsValueName = TermName("deps")
 
-  def makeCakeT0[F[_], A: WeakTypeTag](implicit _F: WeakTypeTag[F[_]]): Tree = makeCakeT[F, A](reify(0))
-
-  def makeCakeT[F[_], A: WeakTypeTag](constructor: Expr[Int])(implicit _F: WeakTypeTag[F[_]]): Tree = {
-    val F = _F.tpe.dealias.typeConstructor.etaExpand
-
-    val baseCake = makeCake[A](constructor)
-
-    val expr =
-      q"""
-       import cats.{~>, Id, Applicative}
-
-       $baseCake.mapK[$F](new ~>[Id, $F] {
-         def apply[A](fa: A) = Applicative[$F].pure(fa)
-       })
-     """
+    val (passConstructorParams, hlistOffset) = constructorParams
+      .foldLeft(List.empty[List[Tree]] -> 0) {
+        case ((paramsAcc, offset), carry) =>
+          val carryAssignments: List[Tree] = carry.indices.map { idx =>
+            c.untypecheck(q"""$depsValueName(${offset + idx})""")
+          }.toList
+          (paramsAcc :+ carryAssignments, offset + carry.size)
+      }
 
     ifDebug {
-      println(sep)
-      println(expr)
+      println(
+        "Constructor params:\n\t" + passConstructorParams.mkString("\n\t")
+      )
       println(sep)
     }
 
-    expr
+    val assignments = {
+      abstractValues.zipWithIndex.map {
+        case (method, idx) =>
+          c.untypecheck(q"override lazy val ${method.name} = $depsValueName(${hlistOffset + idx})")
+      }
+    }
+
+    ifDebug {
+      println("Assignments:\n\t" + assignments.mkString("\n\t"))
+      println(sep)
+    }
+
+    CakeInfo(A, deps, depsValueName, mainType, passConstructorParams, typeRefinements, assignments)
   }
 }

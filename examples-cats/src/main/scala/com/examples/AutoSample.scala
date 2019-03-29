@@ -8,7 +8,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.Duration
 
 object AutoSample {
-  val configPath: Path @@ config = Paths.get("examples/src/main/resources/application.conf").tagged[config]
+  val configPath: Path @@ config = Paths.get("examples-cats/src/main/resources/application.conf").tagged[config]
   def main(args: Array[String]): Unit = {
     val props: Map[String, String] @@ props = Map("foo" -> "hostname").tagged[props]
     val c1                                  = cake[AllComponents1 with ExecutionContextComponent with FileConfigComponent]

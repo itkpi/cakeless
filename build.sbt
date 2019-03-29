@@ -3,7 +3,7 @@ import Dependencies._
 
 lazy val snapshot: Boolean = false
 lazy val v: String = {
-  val vv = "0.3.0"
+  val vv = "0.4.0"
   if (!snapshot) vv
   else vv + "-SNAPSHOT"
 }
@@ -30,10 +30,12 @@ def sonatypeProject(id: String, base: File) =
       },
       scalacOptions ++= Seq("-Ypartial-unification", "-feature"),
       resolvers += Resolver.sonatypeRepo("releases"),
-      addCompilerPlugin("org.spire-math" %% "kind-projector" % "0.9.8"),
+      addCompilerPlugin("org.spire-math"  %% "kind-projector" % "0.9.8"),
+      addCompilerPlugin("org.scalamacros" % "paradise"        % "2.1.0" cross CrossVersion.full),
       libraryDependencies ++= Seq(
         Testing.scalactic,
-        Testing.scalatest
+        Testing.scalatest,
+        Macros.simulacrum
       )
     )
 
@@ -73,10 +75,25 @@ lazy val cakelessZio = sonatypeProject(id = "cakeless-zio", base = file("./zio")
   )
 
 lazy val examplesCats = project
-  .in(file("./examples"))
+  .in(file("./examples-cats"))
   .dependsOn(kernel, cakelessCats)
   .settings(
-    name := "examples",
+    name := "examples-cats",
+    version := v,
+    scalaVersion := `scala-2-12`,
+    scalacOptions += "-Ypartial-unification",
+    addCompilerPlugin("org.spire-math" %% "kind-projector" % "0.9.8"),
+    libraryDependencies ++= Seq(
+      Config.typesafe
+    ),
+    addCompilerPlugin("org.spire-math" %% "kind-projector" % "0.9.8")
+  )
+
+lazy val examplesZio = project
+  .in(file("./examples-zio"))
+  .dependsOn(kernel, cakelessZio)
+  .settings(
+    name := "examples-zio",
     version := v,
     scalaVersion := `scala-2-12`,
     scalacOptions += "-Ypartial-unification",
@@ -89,7 +106,7 @@ lazy val examplesCats = project
 
 lazy val root = project
   .in(file("."))
-  .dependsOn(examplesCats)
+  .dependsOn(examplesCats, examplesZio)
   .aggregate(kernel, cakelessZio, cakelessCats)
   .settings(
     name := "cakeless-root",

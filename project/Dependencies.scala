@@ -9,6 +9,7 @@ object Dependencies {
   val mockitoV        = "2.23.4"
   val macroUtilV      = "1.18"
   val zioV            = "0.19"
+  val simulacrumV     = "0.15.0"
 
   object Shapeless {
     val value = "com.chuusai" %% "shapeless" % shapelessV withSources ()
@@ -34,6 +35,7 @@ object Dependencies {
   }
 
   object Macros {
-    val utils = "com.github.japgolly.microlibs" %% "macro-utils" % macroUtilV withSources ()
+    val utils      = "com.github.japgolly.microlibs" %% "macro-utils" % macroUtilV withSources ()
+    val simulacrum = "com.github.mpilquist"          %% "simulacrum"  % simulacrumV withSources ()
   }
 }

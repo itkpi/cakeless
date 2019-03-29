@@ -1,5 +1,6 @@
 package cakeless.internal
 
+import cakeless.CakeT
 import scala.language.experimental.macros
 import scala.language.higherKinds
 import scala.reflect.macros.whitebox
@@ -12,7 +13,7 @@ import scala.reflect.macros.whitebox
   * Additionally wraps component allocation into monadic context
   * for which [[cats.effect.Sync]] is defined.
   * */
-class SyncResolver(override val c: whitebox.Context) extends DependencyResolver(c) {
+class CatsBasedResolver(override val c: whitebox.Context) extends DependencyResolver(c) {
   import c.universe._
 
   def makeCakeSync0[F[_], A: WeakTypeTag](implicit _F: WeakTypeTag[F[_]]): Tree =
@@ -38,7 +39,7 @@ class SyncResolver(override val c: whitebox.Context) extends DependencyResolver(
        import cats.{~>, Id}
        import cats.effect.Sync
 
-       new cakeless.CakeT[$F, $A] {
+       new _root_.cakeless.CakeT[$F, $A] {
           val baseCake = $baseCake
           type Dependencies = baseCake.Dependencies
           def bake(deps: Dependencies) = Sync[$F].delay(baseCake bake deps)
@@ -50,7 +51,7 @@ class SyncResolver(override val c: whitebox.Context) extends DependencyResolver(
        import cats.effect.Sync
        import cats.effect.concurrent.Ref
 
-       new cakeless.CakeT[$F, $A] {
+       new _root_.cakeless.CakeT[$F, $A] {
           val baseCake = $baseCake
           type Dependencies = baseCake.Dependencies
           
@@ -78,5 +79,43 @@ class SyncResolver(override val c: whitebox.Context) extends DependencyResolver(
     }
 
     expr
+  }
+
+  def makeCakeT0[F[_], A: WeakTypeTag](implicit _F: WeakTypeTag[F[_]]): Tree = makeCakeT[F, A](reify(0))
+
+  def makeCakeT[F[_], A: WeakTypeTag](constructor: Expr[Int])(implicit _F: WeakTypeTag[F[_]]): Tree = {
+    val F = _F.tpe.dealias.typeConstructor.etaExpand
+
+    val baseCake = makeCake[A](constructor)
+
+    val expr =
+      q"""
+       import cats.{~>, Id, Applicative}
+
+       $baseCake.mapK[$F](new ~>[Id, $F] {
+         def apply[A](fa: A) = Applicative[$F].pure(fa)
+       })
+     """
+
+    ifDebug {
+      println(sep)
+      println(expr)
+      println(sep)
+    }
+
+    expr
+  }
+
+  def makeCake0[A: WeakTypeTag]: Tree = makeCake[A](reify(0))
+
+  def makeCake[A: c.universe.WeakTypeTag](constructor: c.universe.Expr[Int]): c.universe.Tree = {
+    val info = getCakeInfo[A](constructor)
+    import info._
+
+    q"""
+       new _root_.cakeless.Cake[$A] {
+         final type Dependencies = $depsType
+         def bake($depsValueName: $depsType): $A = new $mainType(...$passConstructorParams) with ..$typeRefinements { ..$assignments }
+       }"""
   }
 }

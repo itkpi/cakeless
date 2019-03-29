@@ -1,12 +1,16 @@
 package com.examples
 
 import java.nio.file.Path
-import cats.effect.IO
-import cats.MonadError
+
+import scalaz.zio._
+import scalaz.zio.console._
 import com.typesafe.config.{Config, ConfigFactory}
+
 import scala.concurrent.{ExecutionContext, Future}
 import scala.language.higherKinds
 import cakeless.tagging._
+
+import scala.util.Random
 
 trait ExecutionContextComponent {
   implicit def ec: ExecutionContext
@@ -22,7 +26,7 @@ trait PropsComponent {
 
 case class Wiring(ec: ExecutionContext, configPath: Path @@ config, props: Map[String, String] @@ props, token: String @@ token)
 
-case class WiringWithDb(ec: ExecutionContext, configPath: Path @@ config, props: Map[String, String] @@ props, db: Database[IO])
+case class WiringWithDb(ec: ExecutionContext, configPath: Path @@ config, props: Map[String, String] @@ props, db: Database)
 
 trait AllComponents1 { self: ExecutionContextComponent with FileConfigComponent =>
   def getConfigFileAsync: Future[Config] = Future {
@@ -44,14 +48,14 @@ class NestedComponent(implicit val token: String @@ token) { self: AllComponents
 
 class ConnectionFailureException(msg: String) extends Exception(msg)
 
-class Database[F[_]](implicit F: MonadError[F, Throwable]) {
-  def openConnection(): F[Unit] =
-    if (true) F.raiseError(new ConnectionFailureException("Unable to open connection to DB..."))
-    else F.pure(println("Opened connection to database!"))
+class Database {
+  def openConnection(): ZIO[Console, Throwable, Unit] =
+    if (Random.nextBoolean()) ZIO.fail(new ConnectionFailureException("Unable to open connection to DB..."))
+    else putStrLn("Opened connection with DB")
 
-  def close(): F[Unit] = F.pure(println("Closed connenction with DB!"))
+  def close(): ZIO[Console, Nothing, Unit] = putStrLn("Closed connenction with DB!")
 }
 
 trait DbComponent {
-  def db: Database[IO]
+  def db: Database
 }

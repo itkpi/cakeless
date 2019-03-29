@@ -265,7 +265,7 @@ trait CakeT[F[_], A] extends CakeTBase[F, A] { self =>
     *
     * @see [[Lifecycle.preStartF]]
     * */
-  def preStartF(thunk: => F[Unit])(implicit L: Lifecycle[F, CakeT]): CakeT.Aux[F, A, self.Dependencies] =
+  def preStartF(thunk: => F[Unit])(implicit L: Lifecycle[F, Throwable]): CakeT.Aux[F, A, self.Dependencies] =
     L.preStartF(self)(thunk)
 
   /**
@@ -273,7 +273,7 @@ trait CakeT[F[_], A] extends CakeTBase[F, A] { self =>
     *
     * @see [[Lifecycle.preStart]]
     * */
-  def preStart(thunk: => Unit)(implicit L: Lifecycle[F, CakeT]): CakeT.Aux[F, A, self.Dependencies] =
+  def preStart(thunk: => Unit)(implicit L: Lifecycle[F, Throwable]): CakeT.Aux[F, A, self.Dependencies] =
     L.preStart(self)(thunk)
 
   /**
@@ -281,7 +281,7 @@ trait CakeT[F[_], A] extends CakeTBase[F, A] { self =>
     *
     * @see [[Lifecycle.postStartF]]
     * */
-  def postStartF(thunk: => F[Unit])(implicit L: Lifecycle[F, CakeT]): CakeT.Aux[F, A, self.Dependencies] =
+  def postStartF(thunk: => F[Unit])(implicit L: Lifecycle[F, Throwable]): CakeT.Aux[F, A, self.Dependencies] =
     L.postStartF(self)(thunk)
 
   /**
@@ -289,7 +289,7 @@ trait CakeT[F[_], A] extends CakeTBase[F, A] { self =>
     *
     * @see [[Lifecycle.postStart]]
     * */
-  def postStart(thunk: => Unit)(implicit L: Lifecycle[F, CakeT]): CakeT.Aux[F, A, self.Dependencies] =
+  def postStart(thunk: => Unit)(implicit L: Lifecycle[F, Throwable]): CakeT.Aux[F, A, self.Dependencies] =
     L.postStart(self)(thunk)
 
   /**
@@ -297,7 +297,7 @@ trait CakeT[F[_], A] extends CakeTBase[F, A] { self =>
     *
     * @see [[Lifecycle.postStartUseF]]
     * */
-  def postStartUseF(use: A => F[Unit])(implicit L: Lifecycle[F, CakeT]): CakeT.Aux[F, A, self.Dependencies] =
+  def postStartUseF(use: A => F[Unit])(implicit L: Lifecycle[F, Throwable]): CakeT.Aux[F, A, self.Dependencies] =
     L.postStartUseF(self)(use)
 
   /**
@@ -305,7 +305,7 @@ trait CakeT[F[_], A] extends CakeTBase[F, A] { self =>
     *
     * @see [[Lifecycle.postStartUse]]
     * */
-  def postStartUse(use: A => Unit)(implicit L: Lifecycle[F, CakeT]): CakeT.Aux[F, A, self.Dependencies] =
+  def postStartUse(use: A => Unit)(implicit L: Lifecycle[F, Throwable]): CakeT.Aux[F, A, self.Dependencies] =
     L.postStartUse(self)(use)
 
   /**
@@ -313,7 +313,7 @@ trait CakeT[F[_], A] extends CakeTBase[F, A] { self =>
     *
     * @see [[Lifecycle.handleErrorWith]]
     * */
-  def handleErrorWith(f: Throwable => F[A])(implicit L: Lifecycle[F, CakeT]): CakeT.Aux[F, A, self.Dependencies] =
+  def handleErrorWith(f: Throwable => F[A])(implicit L: Lifecycle[F, Throwable]): CakeT.Aux[F, A, self.Dependencies] =
     L.handleErrorWith(self)(f)
 
   /**
@@ -321,7 +321,7 @@ trait CakeT[F[_], A] extends CakeTBase[F, A] { self =>
     *
     * @see [[Lifecycle.handleError]]
     * */
-  def handleError(f: Throwable => A)(implicit L: Lifecycle[F, CakeT]): CakeT.Aux[F, A, self.Dependencies] =
+  def handleError(f: Throwable => A)(implicit L: Lifecycle[F, Throwable]): CakeT.Aux[F, A, self.Dependencies] =
     L.handleError(self)(f)
 
   /**
@@ -329,7 +329,7 @@ trait CakeT[F[_], A] extends CakeTBase[F, A] { self =>
     *
     * @see [[Lifecycle.recoverWith]]
     * */
-  def recoverWith(f: PartialFunction[Throwable, F[A]])(implicit L: Lifecycle[F, CakeT]): CakeT.Aux[F, A, self.Dependencies] =
+  def recoverWith(f: PartialFunction[Throwable, F[A]])(implicit L: Lifecycle[F, Throwable]): CakeT.Aux[F, A, self.Dependencies] =
     L.recoverWith(self)(f)
 
   /**
@@ -337,7 +337,7 @@ trait CakeT[F[_], A] extends CakeTBase[F, A] { self =>
     *
     * @see [[Lifecycle.recover]]
     * */
-  def recover(f: PartialFunction[Throwable, A])(implicit L: Lifecycle[F, CakeT]): CakeT.Aux[F, A, self.Dependencies] =
+  def recover(f: PartialFunction[Throwable, A])(implicit L: Lifecycle[F, Throwable]): CakeT.Aux[F, A, self.Dependencies] =
     L.recover(self)(f)
 
   /**
@@ -346,14 +346,13 @@ trait CakeT[F[_], A] extends CakeTBase[F, A] { self =>
     *
     * @see [[scala.util.control.NonFatal]]
     * @param thunk - replacement for possibly failed [[A]] component
-    * @param F - applicative functor for context [[F]]
     * @param L - lifecycle control for context [[F]]
     * @return - same cake with new component provided
     * */
-  def recoverNonFatal(thunk: => A)(implicit L: Lifecycle[F, CakeT]): CakeT.Aux[F, A, self.Dependencies] =
+  def recoverNonFatal(thunk: => A)(implicit L: Lifecycle[F, Throwable]): CakeT.Aux[F, A, self.Dependencies] =
     L.recover(self) { case NonFatal(_) => thunk }
 
-  def withInitialize(implicit initialize: Initialize[F, A], L: Lifecycle[F, CakeT]): CakeT.Aux[F, A, self.Dependencies] =
+  def withInitialize(implicit initialize: Initialize[F, A], L: Lifecycle[F, Throwable]): CakeT.Aux[F, A, self.Dependencies] =
     L.postStartUseF(self)(initialize.initialize)
 
   def bracketCase[E, B](
