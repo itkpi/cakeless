@@ -13,7 +13,7 @@ class SingletonSpec extends FlatSpec {
       def foo: Int
       i += 1
     }
-    val singletonCake = cakeSingleton[Any, Throwable, SampleComponent]
+    val singletonCake = cakeSingleton[SampleComponent]
 
     val program = for {
       _ <- singletonCake.bake(1 :: HNil)

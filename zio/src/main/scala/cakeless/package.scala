@@ -16,7 +16,7 @@ package object cakeless {
     * Dependencies of [[A]] self-types will be also picked-up
     *
     * */
-  def cakeZ[Effect, Error, A]: CakeZ[Effect, Error, A] = macro ZioResolver.makeZSync0[Effect, Error, A]
+  def cakeZ[A]: CakeZ[Any, Throwable, A] = macro ZioResolver.makeZSync0[A]
 
   /**
     * Entry point for component wiring.
@@ -37,7 +37,7 @@ package object cakeless {
     *
     * @param constructor - sequence number of constructor whose type signature should be used as dependency type for cake
     * */
-  def cakeZ[Effect, Error, A](constructor: Int): CakeZ[Effect, Error, A] = macro ZioResolver.makeZSync[Effect, Error, A]
+  def cakeZ[A](constructor: Int): CakeZ[Any, Throwable, A] = macro ZioResolver.makeZSync[A]
 
   /**
     * Entry point for component wiring.
@@ -55,7 +55,7 @@ package object cakeless {
     * Dependencies of [[A]] self-types will be also picked-up
     *
     * */
-  def cakeSingleton[Effect, Error, A]: CakeZ[Effect, Error, A] = macro ZioResolver.makeCakeZSingleton0[Effect, Error, A]
+  def cakeSingleton[A]: CakeZ[Any, Throwable, A] = macro ZioResolver.makeCakeZSingleton0[A]
 
   /**
     * Entry point for component wiring.
@@ -80,7 +80,7 @@ package object cakeless {
     * Dependencies of [[A]] self-types will be also picked-up
     *
     * */
-  def cakeSingleton[Effect, Error, A](constructor: Int): CakeZ[Effect, Error, A] = macro ZioResolver.makeCakeZSingleton[Effect, Error, A]
+  def cakeSingleton[A](constructor: Int): CakeZ[Any, Throwable, A] = macro ZioResolver.makeCakeZSingleton[A]
 
   /**
     * Implicit conversion used to drop [[HNil]] from the dependency type

@@ -311,6 +311,48 @@ trait CakeZ[-Effect, +Error, A] extends CakeTBase[ZIO[Effect, Error, ?] @uncheck
       def bake(deps: Dependencies): ZIO[R1, E1, A] = self bake deps catchSome pf
     }
 
+  def fold[B](err: Error => B, succ: A => B): CakeZ.Aux[Effect, Nothing, B, self.Dependencies] =
+    new CakeZ[Effect, Nothing, B] {
+      type Dependencies = self.Dependencies
+
+      def bake(deps: Dependencies): ZIO[Effect, Nothing, B] = (self bake deps).fold(err, succ)
+    }
+
+  def either: CakeZ.Aux[Effect, Nothing, Either[Error @uncheckedVariance, A], self.Dependencies] =
+    new CakeZ[Effect, Nothing, Either[Error, A]] {
+      type Dependencies = self.Dependencies
+
+      def bake(deps: Dependencies): ZIO[Effect, Nothing, Either[Error, A]] = (self bake deps).either
+    }
+
+  def foldM[R1 <: Effect, E2, B](err: Error => ZIO[R1, E2, B], succ: A => ZIO[R1, E2, B]): CakeZ.Aux[R1, E2, B, self.Dependencies] =
+    new CakeZ[R1, E2, B] {
+      type Dependencies = self.Dependencies
+
+      def bake(deps: Dependencies): ZIO[R1, E2, B] = (self bake deps).foldM(err, succ)
+    }
+
+  def mapError[E2](f: Error => E2): CakeZ.Aux[Effect, E2, A, self.Dependencies] =
+    new CakeZ[Effect, E2, A] {
+      type Dependencies = self.Dependencies
+
+      def bake(deps: Dependencies): ZIO[Effect, E2, A] = self bake deps mapError f
+    }
+
+  def flatMapError[R1 <: Effect, E2](f: Error => ZIO[R1, Nothing, E2]): CakeZ.Aux[R1, E2, A, self.Dependencies] =
+    new CakeZ[R1, E2, A] {
+      type Dependencies = self.Dependencies
+
+      def bake(deps: Dependencies): ZIO[R1, E2, A] = self bake deps flatMapError f
+    }
+
+  def bimapValue[E2, B](err: Error => E2, succ: A => B): CakeZ.Aux[Effect, E2, B, self.Dependencies] =
+    new CakeZ[Effect, E2, B] {
+      type Dependencies = self.Dependencies
+
+      def bake(deps: Dependencies): ZIO[Effect, E2, B] = (self bake deps).bimap(err, succ)
+    }
+
   def withInitialize[R1 <: Effect, E1 >: Error](
       implicit initialize: Initialize[ZIO[R1, E1, ?], A]
   ): CakeZ.Aux[R1, E1, A, self.Dependencies] =

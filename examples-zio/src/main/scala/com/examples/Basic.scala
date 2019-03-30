@@ -11,19 +11,17 @@ object Basic extends App {
   def run(args: List[String]): ZIO[Basic.Environment, Nothing, Int] = {
     val program = for {
       comp1 <- {
-        cakeZ[Any, Throwable, AllComponents1 with ExecutionContextComponent with FileConfigComponent]
+        cakeZ[AllComponents1 with ExecutionContextComponent with FileConfigComponent]
           .logged("Creating Components 1...")
       }
 
       comp2 <- {
-        cakeZ[Any, Throwable, AllComponents2 with ExecutionContextComponent with PropsComponent]
+        cakeZ[AllComponents2 with ExecutionContextComponent with PropsComponent]
           .logged("Creating Components 2...")
       }
 
       comp3 <- {
-        cakeZ[Any,
-              Throwable,
-              NestedComponent with AllComponents2 with ExecutionContextComponent with FileConfigComponent with PropsComponent]
+        cakeZ[NestedComponent with AllComponents2 with ExecutionContextComponent with FileConfigComponent with PropsComponent]
           .logged("Creating Nested component...")
       }
 

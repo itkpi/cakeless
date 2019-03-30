@@ -25,18 +25,24 @@ object WidenSample extends App {
   case class ConcreteWiring(y: Int @@ y, x: String @@ x)
 
   def run(args: List[String]): ZIO[WidenSample.Environment, Nothing, Int] = {
-    val comp1TestDropsHNil: CakeZ.Aux[Any, Nothing, Comp1, String] = cakeZ[Any, Nothing, Comp1]
+    val comp1TestDropsHNil: CakeZ.Aux[Any, Throwable, Comp1, String] = cakeZ[Comp1]
 
-    val baseCake: CakeZ.Aux[Any, Nothing, Comp2 with Comp1, Base]   = cakeZ[Any, Nothing, Comp2 with Comp1]
-    val sample: CakeZ.Aux[Any, Nothing, Comp2 with Comp1, Concrete] = baseCake.widen
+    val baseCake: CakeZ.Aux[Any, Throwable, Comp2 with Comp1, Base]   = cakeZ[Comp2 with Comp1]
+    val sample: CakeZ.Aux[Any, Throwable, Comp2 with Comp1, Concrete] = baseCake.widen
 
-    for {
+    val program = for {
       comp1 <- comp1TestDropsHNil.bake("without HLIST")
       _     <- putStrLn(comp1.x)
       comp2 <- baseCake.bake(1 :: "BASE CAKE" :: HNil)
       _     <- putStrLn(comp2.xy)
       comp3 <- sample.bake(1.tagged[y] :: "WIDEN CAKE".tagged[x] :: HNil)
       _     <- putStrLn(comp3.xy)
-    } yield 0
+    } yield ()
+
+    program
+      .fold(
+        err = _ => -1,
+        succ = _ => 0
+      )
   }
 }

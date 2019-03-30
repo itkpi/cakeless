@@ -27,7 +27,7 @@ class LifecycleSpec extends FlatSpec {
       isBeforeInstantiation = true
     }
 
-    val c = cakeZ[Any, Throwable, SampleComponent2] preStartF {
+    val c = cakeZ[SampleComponent2] preStartF {
       isBeforeInstantiation = false
       ZIO.unit[Any]
     }
@@ -55,7 +55,7 @@ class LifecycleSpec extends FlatSpec {
       isBeforeInstantiation = true
     }
 
-    val c = cakeZ[Any, Throwable, SampleComponent2] preStart {
+    val c = cakeZ[SampleComponent2] preStart {
       isBeforeInstantiation = false
     }
 
@@ -83,7 +83,7 @@ class LifecycleSpec extends FlatSpec {
       isAfterInstantiation = false
     }
 
-    val c = cakeZ[Any, Throwable, SampleComponent2] postStartF {
+    val c = cakeZ[SampleComponent2] postStartF {
       ZIO(isAfterInstantiation = true)
     }
 
@@ -110,7 +110,7 @@ class LifecycleSpec extends FlatSpec {
       isAfterInstantiation = false
     }
 
-    val c = cakeZ[Any, Throwable, SampleComponent2] postStart {
+    val c = cakeZ[SampleComponent2] postStart {
       isAfterInstantiation = true
     }
 
@@ -226,5 +226,5 @@ class LifecycleSpec extends FlatSpec {
   case class SampleWiring(foo: Int)
 
   private val sampleWiring = SampleWiring(1)
-  private val sampleCake   = cakeZ[Any, Throwable, SampleComponent].as[SampleWiring]
+  private val sampleCake   = cakeZ[SampleComponent].as[SampleWiring]
 }
