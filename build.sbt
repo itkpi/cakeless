@@ -1,7 +1,7 @@
 import xerial.sbt.Sonatype._
 import Dependencies._
 
-lazy val snapshot: Boolean = false
+lazy val snapshot: Boolean = true
 lazy val v: String = {
   val vv = "0.4.0"
   if (!snapshot) vv
