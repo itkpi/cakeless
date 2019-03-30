@@ -39,6 +39,13 @@ trait AllComponents2 { self: ExecutionContextComponent with PropsComponent =>
 }
 
 class NestedComponent(implicit val token: String @@ token) { self: AllComponents2 with ExecutionContextComponent with PropsComponent =>
+
+  def this(username: String @@ username, password: String @@ password) =
+    this()(s"$username@$password".tagged[token])
+
+  def this(numeric: Int) =
+    this()(numeric.toString.tagged[token])
+
   def getConfigAsync(config: Config)(key: String): Future[Option[String]] = Future {
     scala.util.Try(config getString key).toOption
   }
