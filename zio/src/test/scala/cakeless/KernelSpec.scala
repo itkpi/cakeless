@@ -63,21 +63,21 @@ class KernelSpec extends FlatSpec {
   }
 
   "cake for simple component" should "compile" in {
-    val c1 = cakeZ[Any, Throwable, FooComponent]
+    val c1 = cakeZ[FooComponent]
 
     assertCompiles("""implicitly[c1.Dependencies <:< (Int :: HNil)]""")
 
-    val c2 = cakeZ[Any, Throwable, FooComponent with BarComponent]
+    val c2 = cakeZ[FooComponent with BarComponent]
     assertCompiles("""implicitly[c2.Dependencies <:< (Int :: String :: HNil)]""")
   }
 
   it should "work correctly" in {
-    val c1     = cakeZ[Any, Throwable, FooComponent]
+    val c1     = cakeZ[FooComponent]
     val result = c1.bake(1 :: HNil)
 
     assert(runtime.unsafeRun(result).foo == 1)
 
-    val c2      = cakeZ[Any, Throwable, FooComponent with BarComponent]
+    val c2      = cakeZ[FooComponent with BarComponent]
     val result2 = c2.bake(2 :: "bar" :: HNil)
 
     assert(runtime.unsafeRun(result2).foo == 2)
@@ -85,22 +85,22 @@ class KernelSpec extends FlatSpec {
   }
 
   "cakeZ for nested components" should "compile" in {
-    val c1 = cakeZ[Any, Throwable, FooBarComponent with FooComponent with BarComponent]
+    val c1 = cakeZ[FooBarComponent with FooComponent with BarComponent]
     assertCompiles("""implicitly[c1.Dependencies <:< (Int :: String :: HNil)]""")
 
-    val c2 = cakeZ[Any, Throwable, BarBazComponent with BarComponent with BazComponent]
+    val c2 = cakeZ[BarBazComponent with BarComponent with BazComponent]
     assertCompiles("""implicitly[c2.Dependencies <:< (String :: Double :: HNil)]""")
   }
 
   it should "work correctly" in {
-    val c1      = cakeZ[Any, Throwable, FooBarComponent with FooComponent with BarComponent]
+    val c1      = cakeZ[FooBarComponent with FooComponent with BarComponent]
     val result0 = c1.bake(1 :: "foo" :: HNil)
 
     assert(runtime.unsafeRun(result0).foo == 1)
     assert(runtime.unsafeRun(result0).bar == "foo")
     assert(runtime.unsafeRun(result0).fooBar == "1foo")
 
-    val c2      = cakeZ[Any, Throwable, BarBazComponent with BarComponent with BazComponent]
+    val c2      = cakeZ[BarBazComponent with BarComponent with BazComponent]
     val result1 = c2.bake("bar" :: 2.0 :: HNil)
 
     assert(runtime.unsafeRun(result1).bar == "bar")
@@ -109,7 +109,7 @@ class KernelSpec extends FlatSpec {
   }
 
   "cakeZ.bake with Generic" should "work correctly" in {
-    val c2      = cakeZ[Any, Throwable, BarBazComponent with BarComponent with BazComponent]
+    val c2      = cakeZ[BarBazComponent with BarComponent with BazComponent]
     val result1 = c2.as[BarBazWiring] bake BarBazWiring(bar = "bar", baz = 2.0)
 
     assert(runtime.unsafeRun(result1).bar == "bar")
@@ -117,20 +117,20 @@ class KernelSpec extends FlatSpec {
   }
 
   "cakeZ.map" should "work correctly" in {
-    val c1      = cakeZ[Any, Throwable, FooComponent].map(_.foo + 2)
+    val c1      = cakeZ[FooComponent].map(_.foo + 2)
     val result1 = c1.bake(1 :: HNil)
     assert(runtime.unsafeRun(result1) == 3)
   }
 
   "cakeZ.comap" should "work correctly" in {
-    val c1      = cakeZ[Any, Throwable, FooComponent].comap[String](s => s.toInt :: HNil)
+    val c1      = cakeZ[FooComponent].comap[String](s => s.toInt :: HNil)
     val result1 = c1.bake("10")
     assert(runtime.unsafeRun(result1).foo == 10)
   }
 
   "cakeZ.flatMap" should "accumulate depedencies on the typelevel" in {
-    val c1 = cakeZ[Any, Throwable, FooBarComponent with FooComponent with BarComponent]
-    val c2 = cakeZ[Any, Throwable, BarBazComponent with BarComponent with BazComponent]
+    val c1 = cakeZ[FooBarComponent with FooComponent with BarComponent]
+    val c2 = cakeZ[BarBazComponent with BarComponent with BazComponent]
 
     val c3 = for {
       c1 <- c1
@@ -141,8 +141,8 @@ class KernelSpec extends FlatSpec {
   }
 
   it should "work correctly" in {
-    val c1 = cakeZ[Any, Throwable, FooBarComponent with FooComponent with BarComponent]
-    val c2 = cakeZ[Any, Throwable, BarBazComponent with BarComponent with BazComponent]
+    val c1 = cakeZ[FooBarComponent with FooComponent with BarComponent]
+    val c2 = cakeZ[BarBazComponent with BarComponent with BazComponent]
 
     val c3 = for {
       c1 <- c1
@@ -158,8 +158,8 @@ class KernelSpec extends FlatSpec {
   }
 
   "cakeZ" should "provide CakeZ with specific constructor" in {
-    val c0 = cakeZ[Any, Throwable, ComponentWithConstructors with FooComponent]
-    val c1 = cakeZ[Any, Throwable, ComponentWithConstructors with FooComponent](1)
+    val c0 = cakeZ[ComponentWithConstructors with FooComponent]
+    val c1 = cakeZ[ComponentWithConstructors with FooComponent](1)
 
     assertCompiles("""implicitly[c0.Dependencies <:< (BigInt :: Int :: HNil)]""")
     assertCompiles("""implicitly[c1.Dependencies <:< (Long :: Int :: HNil)]""")
@@ -217,7 +217,7 @@ class KernelSpec extends FlatSpec {
 
   "CakeZ.depMap" should "work correctly" in {
     val c0: CakeZ.Aux[Any, Throwable, FooComponent, FooWiringConcrete] =
-      cakeZ[Any, Throwable, FooComponent].comap[FooWiringConcrete](_.foo :: HNil)
+      cakeZ[FooComponent].comap[FooWiringConcrete](_.foo :: HNil)
     val c1 = c0.depMap { (dep, fooComponent) =>
       s"${dep.foo}=${fooComponent.foo}"
     }
@@ -228,9 +228,9 @@ class KernelSpec extends FlatSpec {
   }
 
   "CakeZ.depFlatMap" should "work correctly" in {
-    val c0 = cakeZ[Any, Throwable, FooComponent]
+    val c0 = cakeZ[FooComponent]
     val c1 = c0.depFlatMap { (dep, fooComponent) =>
-      cakeZ[Any, Throwable, BarComponent].map { bar =>
+      cakeZ[BarComponent].map { bar =>
         s"$dep --> ${bar.bar}"
       }
     }
@@ -267,7 +267,7 @@ class KernelSpec extends FlatSpec {
   }
 
   "CakeZ.comapM" should "work correctly" in {
-    val c0: CakeZ.Aux[Any, Throwable, FooComponent, Int] = cakeZ[Any, Throwable, FooComponent]
+    val c0: CakeZ.Aux[Any, Throwable, FooComponent, Int] = cakeZ[FooComponent]
     val c1 = c0.comapM { str: String =>
       ZIO(str.toInt)
     }

@@ -12,8 +12,9 @@ object AutoSample extends App {
 
   def run(args: List[String]): ZIO[AutoSample.Environment, Nothing, Int] = {
     val props: Map[String, String] @@ props = Map("foo" -> "hostname").tagged[props]
-    val c1                                  = cakeZ[Any, Throwable, AllComponents1 with ExecutionContextComponent with FileConfigComponent]
-    val c2                                  = cakeZ[Any, Throwable, AllComponents2 with ExecutionContextComponent with PropsComponent]
+
+    val c1 = cakeZ[AllComponents1 with ExecutionContextComponent with FileConfigComponent]
+    val c2 = cakeZ[AllComponents2 with ExecutionContextComponent with PropsComponent]
     val program = for {
       c1 <- c1
       c2 <- c2

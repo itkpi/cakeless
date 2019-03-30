@@ -4,13 +4,11 @@ import java.nio.file.Path
 
 import scalaz.zio._
 import scalaz.zio.console._
+import scalaz.zio.random._
 import com.typesafe.config.{Config, ConfigFactory}
-
 import scala.concurrent.{ExecutionContext, Future}
 import scala.language.higherKinds
 import cakeless.tagging._
-
-import scala.util.Random
 
 trait ExecutionContextComponent {
   implicit def ec: ExecutionContext
@@ -49,9 +47,11 @@ class NestedComponent(implicit val token: String @@ token) { self: AllComponents
 class ConnectionFailureException(msg: String) extends Exception(msg)
 
 class Database {
-  def openConnection(): ZIO[Console, Throwable, Unit] =
-    if (Random.nextBoolean()) ZIO.fail(new ConnectionFailureException("Unable to open connection to DB..."))
-    else putStrLn("Opened connection with DB")
+  def openConnection(): ZIO[Console with Random, Throwable, Unit] =
+    nextBoolean.flatMap {
+      case true  => ZIO.fail(new ConnectionFailureException("Unable to open connection to DB..."))
+      case false => putStrLn("Opened connection with DB")
+    }
 
   def close(): ZIO[Console, Nothing, Unit] = putStrLn("Closed connenction with DB!")
 }

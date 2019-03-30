@@ -12,7 +12,7 @@ import shapeless.syntax.singleton._
 
 object LifecycleExample extends App {
   def run(args: List[String]): ZIO[LifecycleExample.Environment, Nothing, Int] = {
-    val comp1 = cakeZ[Any, Throwable, AllComponents1 with ExecutionContextComponent with FileConfigComponent]
+    val comp1 = cakeZ[AllComponents1 with ExecutionContextComponent with FileConfigComponent]
       .preStart {
         println("Components 1 preStart.. ")
       }
@@ -21,12 +21,11 @@ object LifecycleExample extends App {
       }
 
     val comp2 =
-      cakeSingleton[Any, Throwable, AllComponents2 with ExecutionContextComponent with PropsComponent with DbComponent]
+      cakeSingleton[AllComponents2 with ExecutionContextComponent with PropsComponent with DbComponent]
         .postStartUseF { comp =>
-          println("Opening connection with DB...")
-          comp.db
-            .openConnection()
-            .retry(ZSchedule.recurs(10))
+          val open = putStrLn("Opening connection with DB...") *> comp.db.openConnection()
+
+          open.retry(ZSchedule.recurs(10))
         }
         .catchSomeWith {
           case e: ConnectionFailureException =>
