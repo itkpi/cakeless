@@ -1,4 +1,4 @@
-lazy val snapshot: Boolean = true
+lazy val snapshot: Boolean = false
 isSnapshot in ThisBuild := snapshot
 version in ThisBuild := {
   val vv = "1.0.0-rc1"

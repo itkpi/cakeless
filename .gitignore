@@ -2,7 +2,5 @@
 *.log
 .idea/
 *.iml
-
 target/
-scalavista.json
-.bloop/
+sonatype.sbt

@@ -48,6 +48,9 @@ lazy val examples = project
   .in(file("./examples"))
   .dependsOn(cakeless)
   .settings(
+    skip in publish := true,
+    publish := {},
+    publishLocal := {},
     name := "examples",
     libraryDependencies ++= Seq(
       Config.typesafe,
