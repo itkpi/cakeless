@@ -2,14 +2,12 @@ package com.examples
 
 import java.nio.file.Paths
 import cakeless._
-import cakeless.internal.InjectionMagnet
 import com.examples.types.{ConfigPath, Props}
 import com.typesafe.config.{Config, ConfigException}
 import zio._
 import zio.console._
 import zio.random._
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration._
 import ExecutionContext.Implicits.global
 
 object LifecycleExample extends App {
