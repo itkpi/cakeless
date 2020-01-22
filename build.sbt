@@ -32,7 +32,7 @@ def sonatypeProject(id: String, base: File) =
     .withMacroAnnotations()
     .withCommonSettings()
 
-lazy val `cakeless-new` = sonatypeProject(id = "cakeless-new", base = file("./cakeless"))
+lazy val cakeless = sonatypeProject(id = "cakeless", base = file("./cakeless"))
   .settings(
     libraryDependencies ++= {
       Seq(
@@ -46,7 +46,7 @@ lazy val `cakeless-new` = sonatypeProject(id = "cakeless-new", base = file("./ca
 
 lazy val examples = project
   .in(file("./examples"))
-  .dependsOn(`cakeless-new`)
+  .dependsOn(cakeless)
   .settings(
     name := "examples",
     libraryDependencies ++= Seq(
@@ -57,7 +57,7 @@ lazy val examples = project
   .withCommonSettings()
 
 lazy val root = project.in(file("."))
-  .aggregate(`cakeless-new`, examples)
+  .aggregate(cakeless, examples)
   .settings(
     name := "cakeless-new-root",
     skip in publish := true,
