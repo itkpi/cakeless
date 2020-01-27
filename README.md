@@ -1,6 +1,6 @@
 ---
 Project: Cakeless
-Current version: 1.0.0-rc1-SNAPSHOT
+Current version: 1.0.0-rc2-SNAPSHOT
 Scala version: 2.12.10, 2.13.1
 ---
 
