@@ -36,7 +36,6 @@ lazy val cakeless = sonatypeProject(id = "cakeless", base = file("./cakeless"))
   .settings(
     libraryDependencies ++= {
       Seq(
-        Shapeless.value,
         Macros.utils,
         Zio.zio,
         Testing.mockito

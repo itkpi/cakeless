@@ -2,7 +2,7 @@ package cakeless
 
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
 import zio._
-import org.scalatest.{Assertion, FlatSpec, WordSpec}
+import org.scalatest.{Assertion, WordSpec}
 
 class LifecycleSpec extends WordSpec {
   private val sampleWiring = SampleWiring(1)

@@ -1,3 +1,0 @@
-package cakeless
-
-class Suit {}

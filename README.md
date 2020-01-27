@@ -17,7 +17,7 @@ To try it, add the following into your `build.sbt` file:
 resolvers += "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"
 
 libraryDependencies ++= {
-  val cakelessV = "1.0.0-rc1-SNAPSHOT"
+  val cakelessV = "1.0.0-rc2-SNAPSHOT"
   Seq(
     "ua.pp.itkpi" %% "cakeless" % cakelessV
   )

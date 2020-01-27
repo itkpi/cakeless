@@ -1,7 +1,6 @@
 package cakeless.internal
 
 import japgolly.microlibs.macro_utils.MacroUtils
-import shapeless._
 import scala.language.experimental.macros
 import scala.reflect.macros.whitebox
 
@@ -16,18 +15,15 @@ abstract class DependencyResolver(val c: whitebox.Context) extends MacroUtils {
 
   case class CakeInfo(
       A: Type,
-      depsType: Tree,
       depsTypesList: List[Type],
       depsValueName: TermName,
       mainType: Type,
-      passConstructorParams: List[List[Tree]],
+      passConstructorParamsIndexes: List[List[Int]],
       typeRefinements: List[Type],
-      assignments: List[Tree],
+      assignmentWithIndexes: List[(TermName, Int)],
       excludedTypes: List[Type],
       excludedDeps: List[MethodSymbol]
   )
-
-  protected val hnil = typeOf[HNil].dealias
 
   protected val debug = sys.env.getOrElse("cakeless_macro_debug", "false").toBoolean
 
@@ -36,16 +32,6 @@ abstract class DependencyResolver(val c: whitebox.Context) extends MacroUtils {
 
   protected def ifDebug[U](thunk: => U): Unit =
     if (debug) thunk
-
-  protected def buildHListType(returnTypes: List[Type]): Tree = {
-    def buildHList(head: Type, remaining: List[Type]): Tree = remaining match {
-      case Nil                  => tq"shapeless.::[$head, $hnil]"
-      case scala.::(dep, rest0) => tq"shapeless.::[$head, ${buildHList(dep, rest0)}]"
-    }
-
-    val scala.::(first, rest) = returnTypes.map(_.resultType.dealias)
-    buildHList(first, rest)
-  }
 
   protected def extractClassesChain(tpe: Type): List[Type] = tpe match {
     case RefinedType(types, _) => types.flatMap(extractClassesChain)
@@ -132,7 +118,6 @@ abstract class DependencyResolver(val c: whitebox.Context) extends MacroUtils {
     }
 
     val allParamsList = constructorParams.flatMap(_.map(_.typeSignature.dealias)) ++ abstractMembersReturnTypes
-    val deps          = buildHListType(allParamsList)
 
     val typeRefinements = refinements.flatMap(extractClassesChain).filterNot(_ <:< mainType).distinct
 
@@ -143,13 +128,11 @@ abstract class DependencyResolver(val c: whitebox.Context) extends MacroUtils {
 
     val depsValueName = TermName("deps")
 
-    val (passConstructorParams, hlistOffset) = constructorParams
-      .foldLeft(List.empty[List[Tree]] -> 0) {
+    val (passConstructorParams, abstractValuesOffset) = constructorParams
+      .foldLeft(List.empty[List[Int]] -> 0) {
         case ((paramsAcc, offset), carry) =>
-          val carryAssignments: List[Tree] = carry.indices.map { idx =>
-            c.untypecheck(q"""$depsValueName(${offset + idx})""")
-          }.toList
-          (paramsAcc :+ carryAssignments, offset + carry.size)
+          val carryIndexes: List[Int] = carry.indices.map(_ + offset).toList
+          (paramsAcc :+ carryIndexes, offset + carry.size)
       }
 
     ifDebug {
@@ -159,27 +142,26 @@ abstract class DependencyResolver(val c: whitebox.Context) extends MacroUtils {
       println(sep)
     }
 
-    val assignments = {
+    val assignmentIndexes = {
       abstractValues.zipWithIndex.map {
         case (method, idx) =>
-          c.untypecheck(q"override lazy val ${method.name} = $depsValueName(${hlistOffset + idx})")
+          (method.name, abstractValuesOffset + idx)
       }
     }
 
     ifDebug {
-      println("Assignments:\n\t" + assignments.mkString("\n\t"))
+      println("Assignments:\n\t" + assignmentIndexes.mkString("\n\t"))
       println(sep)
     }
 
     CakeInfo(
       A,
-      deps,
       allParamsList,
       depsValueName,
       mainType,
       passConstructorParams,
       typeRefinements,
-      assignments,
+      assignmentIndexes,
       excludedTypes,
       excludedMembers
     )
