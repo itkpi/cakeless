@@ -1,7 +1,6 @@
 package cakeless.internal
 
 import scala.reflect.macros.{whitebox, TypecheckException}
-import zio._
 import zio.blocking.Blocking
 import zio.clock.Clock
 import zio.console.Console
@@ -22,15 +21,22 @@ class EnvProvider(override val c: whitebox.Context) extends DependencyResolver(c
       println(s"Excluded types: $excludedTypes\nexcluded deps: $excludedDeps")
       println(sep)
     }
-    val depsValueName   = TermName("deps")
-    val instanceName    = TermName(c.freshName("instance"))
-    val standardDepName = TermName(c.freshName("zenv"))
-    val assignmentsWithExclusions = assignments ++ excludedDeps.map { method =>
-      val itsTpe = method.returnType.dealias
-      val (_, selectionCode) = zenvMembers.find { case (zenvTpe, _) => itsTpe <:< zenvTpe }.getOrElse {
-        fail(s"Not found ZEnv method for method $method with return type $itsTpe")
+//    val depsValueName   = TermName("deps")
+    val instanceName          = TermName(c.freshName("instance"))
+    val standardDepName       = TermName(c.freshName("zenv"))
+    val passConstructorParams = passConstructorParamsIndexes.map(_.map(dependenciesList(_)))
+    val assignmentsWithExclusions = {
+      val overrides = assignmentWithIndexes.map {
+        case (name, idx) => c.untypecheck(q"""override lazy val $name = ${dependenciesList(idx)}""")
       }
-      c.untypecheck(q"override lazy val ${method.name}: $itsTpe = $standardDepName.$selectionCode")
+      val exclusions = excludedDeps.map { method =>
+        val itsTpe = method.returnType.dealias
+        val (_, selectionCode) = zenvMembers.find { case (zenvTpe, _) => itsTpe <:< zenvTpe }.getOrElse {
+          fail(s"Not found ZEnv method for method $method with return type $itsTpe")
+        }
+        c.untypecheck(q"override lazy val ${method.name}: $itsTpe = $standardDepName.$selectionCode")
+      }
+      overrides ++ exclusions
     }
     val refinementsWithExclusions = typeRefinements ++ excludedTypes
     val envCode                   = q"""new $mainType(...$passConstructorParams) with ..$refinementsWithExclusions { ..$assignmentsWithExclusions }"""
@@ -54,9 +60,7 @@ class EnvProvider(override val c: whitebox.Context) extends DependencyResolver(c
     }
 
     val expr = q"""
-       import _root_.shapeless._
-       import zio._
-       val $depsValueName = $dependenciesList
+       import _root_.zio._
        val $instanceName  = $instance
        $provideCode
      """
@@ -84,7 +88,7 @@ class EnvProvider(override val c: whitebox.Context) extends DependencyResolver(c
     zenvMembers.map(_._1)
   }
 
-  private def collectDependencies(depsTypes: List[Type]): Tree = {
+  private def collectDependencies(depsTypes: List[Type]): List[Tree] = {
     val clsBody = enclosingClassBody
     val members = clsBody
       .collect {
@@ -120,15 +124,15 @@ class EnvProvider(override val c: whitebox.Context) extends DependencyResolver(c
     }
 
     ifDebug {
-      println(s"Wirings:\n\t${depsWithImpls.map { case (dep, impl) => s"dep -> $impl" }.mkString("\n\t")}")
+      println(s"Wirings:\n\t${depsWithImpls.map { case (_, impl) => s"dep -> $impl" }.mkString("\n\t")}")
     }
-    c.parse(depsWithImpls.map(_._2).mkString("", " :: ", " :: HNil"))
+    depsWithImpls.map(_._2)
   }
 
   private def enclosingClassBody: List[Tree] =
     ((c.enclosingClass match {
-      case cd @ ClassDef(_, _, _, Template(parents, self, body)) => parents ++ body
-      case md @ ModuleDef(_, _, Template(parents, self, body))   => parents ++ body
+      case ClassDef(_, _, _, Template(parents, _, body)) => parents ++ body
+      case ModuleDef(_, _, Template(parents, _, body))   => parents ++ body
       case e =>
         fail(s"Unknown type of enclosing class: ${e.getClass}")
     }) ++ {
