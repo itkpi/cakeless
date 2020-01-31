@@ -5,52 +5,45 @@ import zio._
 import scala.language.implicitConversions
 
 trait InjectionMagnet[R, E, A] {
-  type ProvideRes <: ZIO[Nothing, E, A]
-  type ProvideSomeRes[R0] >: ZIO[R0, E, A]
-  def provide(creation: UIO[R]): ProvideRes
-  def provideSome[R0](creation: R0 => UIO[R]): ProvideSomeRes[R0]
+  type RR[R0]
+  def provideSome[R0](creation: R0 => UIO[R]): ZIO[RR[R0], E, A]
 }
 
 trait LowPriorityMagnet {
-  implicit def fromZio[R, E, A](zio: ZIO[R, E, A]): InjectionMagnet.Aux[R, E, A, IO[E, A], ZIO[*, E, A]] = new InjectionMagnet[R, E, A] {
-    override type ProvideRes        = IO[E, A]
-    override type ProvideSomeRes[x] = ZIO[x, E, A]
-    override def provide(creation: UIO[R]): ProvideRes = zio.provideM(
-      ZIO.environment[R].provideM(creation)
-    )
-    override def provideSome[R0](creation: R0 => UIO[R]): ProvideSomeRes[R0] = zio.provideSomeM(ZIO.environment[R0].flatMap(creation))
+  implicit def fromZio[R, E, A](zio: ZIO[R, E, A])(implicit exclude: ZEnvExcluder[R]): InjectionMagnet.Aux[exclude.Excluded, E, A, Id] = {
+    new InjectionMagnet[exclude.Excluded, E, A] {
+      type RR[R0] = R0
+      override def provideSome[R0](creation: R0 => UIO[exclude.Excluded]): ZIO[R0, E, A] = zio.provideSomeM[R0, E](
+        ZIO.environment[R0].flatMap(creation).map(exclude.construct)
+      )
+    }
   }
 }
 
 object InjectionMagnet extends LowPriorityMagnet {
-  type Aux[R, E, A, Res0 <: ZIO[Nothing, E, A], Res1[x] >: ZIO[x, E, A]] = InjectionMagnet[R, E, A] {
-    type ProvideRes = Res0; type ProvideSomeRes[x] = Res1[x]
-  }
+
+  type Aux[R, E, A, RR0[_]] = InjectionMagnet[R, E, A] {type RR[R0] = RR0[R0]}
 
   implicit def fromZioWithLifecycle[R, R1, R2, E, A](
       tuple: (ZIO[R, E, A], Lifecycle[R1, R2, R])
-  ): InjectionMagnet.Aux[R2 with R with R1, E, A, ZIO[R2 with R1, E, A], λ[x => ZIO[R2 with R1 with x, E, A]]] = {
+  )(implicit exclude: ZEnvExcluder[R]): InjectionMagnet.Aux[exclude.Excluded, E, A, λ[R0 => R2 with R1 with R0]] = {
     val (zio, lf) = tuple
 
-    new InjectionMagnet[R2 with R with R1, E, A] {
-      override type ProvideRes        = ZIO[R2 with R1, E, A]
-      override type ProvideSomeRes[x] = ZIO[R2 with R1 with x, E, A]
-      override def provide(creation: UIO[R2 with R with R1]): ProvideRes =
-        for {
-          _   <- lf.preStartURIO
-          c   <- creation
-          res <- zio.provide(c)
-          _   <- lf.postStartURIO(c)
-        } yield res
+    new InjectionMagnet[exclude.Excluded, E, A] {
+      type RR[R0] = R2 with R1 with R0
+      override def provideSome[R0](creation: R0 => UIO[exclude.Excluded]): ZIO[R2 with R1 with R0, E, A] = {
+        val construct: URIO[R2 with R0 with R1, R] = for {
+          _ <- lf.preStartURIO
+          r0 <- ZIO.environment[R0]
+          c <- creation(r0)
+          all = exclude.construct(c)
+          _ <- lf.postStartURIO(all)
+        } yield all
 
-      override def provideSome[R0](creation: R0 => UIO[R2 with R with R1]): ProvideSomeRes[R0] =
-        for {
-          r0  <- ZIO.environment[R0]
-          _   <- lf.preStartURIO
-          c   <- creation(r0)
-          res <- zio.provide(c)
-          _   <- lf.postStartURIO(c)
-        } yield res
+        construct.flatMap (all =>
+          zio.provide(all)
+        )
+      }
     }
   }
 }

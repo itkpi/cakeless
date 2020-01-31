@@ -2,6 +2,8 @@ package com.examples
 
 import java.nio.file.Paths
 import cakeless._
+import cakeless.internal.{InjectionMagnet, ZEnvExcluder}
+import cakeless.internal.InjectionMagnet.Aux
 import com.examples.types.{ConfigPath, Props}
 import com.typesafe.config.{Config, ConfigException}
 import zio._
@@ -35,13 +37,16 @@ object LifecycleExample extends App {
           .catchAll(e => ZIO.succeed(e.getMessage))
       }
 
-      val x: Lifecycle[Any, Console with Random, DbComponent] = Lifecycle.postStart { (comp2: DbComponent) =>
+      val lifecycle: Lifecycle[Any, Console with Random, DbComponent] = Lifecycle.postStart { (comp2: DbComponent) =>
         val open = putStrLn("Opening connection with DB...") *> comp2.db.openConnection()
 
         open.retry(Schedule.recurs(10)).orDie
       }
 
-      injectPrimary(getFromDb, x)
+
+      val xx = ZEnvExcluder.excludeRight[AllComponents2 with DbComponent with Console with Random, Console with Random]
+      val y = injectPrimary(getFromDb, lifecycle)
+      y
     }
 
     program.fold(_ => 1, _ => 0)

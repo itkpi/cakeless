@@ -41,8 +41,9 @@ object Example extends App {
 //     todo: uncomment these 3 lines and comment `injectPrimary` to see how specific constructor selection works like
 //        val username: Username = Username("vitaliihonta")
 //        val password: Password = Password("password")
-//        inject(url)(1)
-    injectPrimary(url)
+//  val wired = inject(url)(1)
+    val wired: IO[IllegalArgumentException, String] = injectPrimary(url)
+    wired
       .catchAll(e => ZIO.succeed(e.getMessage))
       .flatMap(putStrLn) *> ZIO.succeed(0)
   }

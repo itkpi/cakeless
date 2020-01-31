@@ -10,10 +10,10 @@ class EnvProvider(override val c: whitebox.Context) extends DependencyResolver(c
 
   import c.universe._
 
-  def injectPrimaryImpl[R: WeakTypeTag, E: WeakTypeTag, A: WeakTypeTag](instance: Expr[InjectionMagnet[R, E, A]]): Tree =
-    injectImpl[R, E, A](instance)(reify(0))
+  def injectPrimaryImpl[R: WeakTypeTag, E: WeakTypeTag, A: WeakTypeTag](instance: Expr[InjectionMagnet[R, E, A]])(exclude: Tree): Tree =
+    injectImpl[R, E, A](instance)(reify(0))(exclude)
 
-  def injectImpl[R: WeakTypeTag, E: WeakTypeTag, A: WeakTypeTag](instance: Expr[InjectionMagnet[R, E, A]])(constructor: Expr[Int]): Tree = {
+  def injectImpl[R: WeakTypeTag, E: WeakTypeTag, A: WeakTypeTag](instance: Expr[InjectionMagnet[R, E, A]])(constructor: Expr[Int])(exclude: Tree): Tree = {
     val info = getCakeInfo[R](constructor, refinementExclusions = zenv, depsExclusions = zenvDeps)
     import info._
     val dependenciesList = collectDependencies(depsTypesList)
@@ -43,7 +43,7 @@ class EnvProvider(override val c: whitebox.Context) extends DependencyResolver(c
 
     val createInstanceCode = q"ZIO.effectTotal($envCode)"
     val provideCode = excludedTypes match {
-      case Nil => q"""$instanceName.provide($createInstanceCode)"""
+      case Nil => q"""$instanceName.provideSome[$any](_ => $createInstanceCode)"""
       case List(single) =>
         q"""
           $instanceName.provideSome[$single] { (x: $single) =>
@@ -143,4 +143,6 @@ class EnvProvider(override val c: whitebox.Context) extends DependencyResolver(c
         }
         .takeWhile(_.pos.line <= c.enclosingPosition.line)
     }).distinct
+
+  private val any = typeOf[Any].dealias
 }
