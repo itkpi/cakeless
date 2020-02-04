@@ -19,10 +19,6 @@ trait PropsComponent {
   def props: Props
 }
 
-case class Wiring(ec: ExecutionContext, configPath: ConfigPath, props: Props, token: Token)
-
-case class WiringWithDb(ec: ExecutionContext, configPath: ConfigPath, props: Props, db: Database)
-
 trait AllComponents1 {
   self: FileConfigComponent =>
 

@@ -2,7 +2,7 @@ package cakeless
 
 import zio._
 
-class Lifecycle[-R1, -R2, -A] private (val preStartURIO: URIO[R1, Unit], val postStartURIO: A => URIO[R2, Unit]) {
+class Lifecycle[-R1, -R2, -A] private (val preStartURIO: URIO[R1, Unit], val postStartURIO: A => URIO[R2, Unit]) { self =>
   def preStart[R3 <: R1](thunk: URIO[R3, Unit]): Lifecycle[R3, R2, A] =
     new Lifecycle[R3, R2, A](preStartURIO *> thunk, postStartURIO)
 
@@ -13,6 +13,12 @@ class Lifecycle[-R1, -R2, -A] private (val preStartURIO: URIO[R1, Unit], val pos
     new Lifecycle[R1, R3, AA](
       preStartURIO,
       a => postStartURIO(a) *> use(a)
+    )
+
+  def &&[R3 <: R1, R4 <: R2, AA <: A](that: Lifecycle[R3, R4, AA]): Lifecycle[R3, R4, AA] =
+    new Lifecycle[R3, R4, AA](
+      preStartURIO = self.preStartURIO *> that.preStartURIO,
+      postStartURIO = aa => self.postStartURIO(aa) *> that.postStartURIO(aa)
     )
 }
 

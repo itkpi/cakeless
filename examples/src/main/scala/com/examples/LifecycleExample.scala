@@ -15,17 +15,21 @@ object LifecycleExample extends App {
   val props: Props           = Props(Map("host" -> "localhost"))
   val db: Database           = new Database
 
-  def run(args: List[String]): ZIO[ZEnv, Nothing, Int] = {
-    val comp1: ZIO[Console, ConfigException, Config] = injectPrimary(
-      ZIO.accessM[AllComponents1](_.getConfigFile).tap(c => putStrLn(c.toString)),
-      Lifecycle
-        .preStart(
-          putStrLn("Component 1 preStart")
+  def run(args: List[String]): ZIO[zio.ZEnv, Nothing, Int] = {
+    val comp1: ZIO[Console, ConfigException, Config] =
+      ZIO
+        .accessM[AllComponents1](_.getConfigFile)
+        .tap(c => putStrLn(c.toString))
+        .injectPrimary
+        .withLifecycle(
+          Lifecycle.preStart(
+            putStrLn("Component 1 preStart")
+          ) && Lifecycle.postStart(
+            putStrLn("Component 1 started!")
+          )
         )
-        .postStart(
-          putStrLn("Component 1 started!")
-        )
-    )
+        .excludeZEnv[Console]
+        .wire
 
     val program: ZIO[Console with Random, ConfigException, String] = comp1.flatMap { config =>
       val table = config.getString("table")
@@ -35,13 +39,16 @@ object LifecycleExample extends App {
           .catchAll(e => ZIO.succeed(e.getMessage))
       }
 
-      val x: Lifecycle[Any, Console with Random, DbComponent] = Lifecycle.postStart { (comp2: DbComponent) =>
-        val open = putStrLn("Opening connection with DB...") *> comp2.db.openConnection()
+      getFromDb.injectPrimary
+        .withLifecycle {
+          Lifecycle.postStart { comp2: DbComponent =>
+            val open = putStrLn("Opening connection with DB...") *> comp2.db.openConnection()
 
-        open.retry(Schedule.recurs(10)).orDie
-      }
-
-      injectPrimary(getFromDb, x)
+            open.retry(Schedule.recurs(10)).orDie
+          }
+        }
+        .excludeZEnv[Console with Random]
+        .wire
     }
 
     program.fold(_ => 1, _ => 0)

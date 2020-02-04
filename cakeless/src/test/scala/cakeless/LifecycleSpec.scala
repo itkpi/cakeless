@@ -3,21 +3,24 @@ package cakeless
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
 import zio._
 import org.scalatest.{Assertion, WordSpec}
+import zio.console._
 
 class LifecycleSpec extends WordSpec {
   private val sampleWiring = SampleWiring(1)
-  private val sampleZio   = ZIO.environment[SampleComponent].as(1)
+  private val sampleZio    = ZIO.environment[SampleComponent].as(1)
 
   private val runtime = new DefaultRuntime {}
 
   def preStartSpec(): Assertion = {
     val reacted = new AtomicBoolean(false)
-    val c: UIO[Int] = injectPrimary(
-      sampleZio,
-      Lifecycle.preStart(ZIO.effectTotal {
-        reacted.set(true)
-      })
-    )
+    val c: UIO[Int] =
+      sampleZio.injectPrimary.withLifecycle {
+        Lifecycle.preStart {
+          ZIO.effectTotal {
+            reacted.set(true)
+          }
+        }
+      }.wire
 
     runtime.unsafeRun(c)
 
@@ -34,12 +37,18 @@ class LifecycleSpec extends WordSpec {
       isBeforeInstantiation.set(true)
     }
 
-    val c: UIO[Int] = injectPrimary(
-      ZIO.access[SampleComponent2](_.foo.foo),
-      Lifecycle.preStart(ZIO.effectTotal {
-        isBeforeInstantiation.set(false)
-      })
-    )
+    val c: UIO[Int] =
+      ZIO
+        .access[SampleComponent2](_.foo.foo)
+        .injectPrimary
+        .withLifecycle {
+          Lifecycle.preStart {
+            ZIO.effectTotal {
+              isBeforeInstantiation.set(false)
+            }
+          }
+        }
+        .wire
 
     runtime.unsafeRun(c)
 
@@ -50,12 +59,14 @@ class LifecycleSpec extends WordSpec {
 
   def postStartSpec(): Assertion = {
     var reacted: Boolean = false
-    val c: UIO[Int] = injectPrimary(
-      sampleZio,
-      Lifecycle.postStart(ZIO.effectTotal {
-        reacted = true
-      })
-    )
+    val c: UIO[Int] =
+      sampleZio.injectPrimary.withLifecycle {
+        Lifecycle.postStart {
+          ZIO.effectTotal {
+            reacted = true
+          }
+        }
+      }.wire
 
     runtime.unsafeRun(c)
 
@@ -71,12 +82,16 @@ class LifecycleSpec extends WordSpec {
       isAfterInstantiation.set(false)
     }
 
-    val c: UIO[Int] = injectPrimary(
-      ZIO.access[SampleComponent2](_.foo.foo),
-      Lifecycle.postStart(ZIO.effectTotal {
-        isAfterInstantiation.set(true)
-      })
-    )
+    val c: UIO[Int] =
+      ZIO
+        .access[SampleComponent2](_.foo.foo)
+        .injectPrimary
+        .withLifecycle {
+          Lifecycle.postStart(ZIO.effectTotal {
+            isAfterInstantiation.set(true)
+          })
+        }
+        .wire
 
     runtime.unsafeRun(c)
 
@@ -86,17 +101,26 @@ class LifecycleSpec extends WordSpec {
   "Lifecycle.postStart executes after instantiation" in executesAfterInstantiation()
 
   def componentUsage(): Assertion = {
-    val flag = new AtomicBoolean(false)
+    val flag          = new AtomicBoolean(false)
     val postUsedValue = new AtomicInteger(0)
-    val c: UIO[Boolean] = injectPrimary(
-      sampleZio.map(_ => flag.get()),
-      Lifecycle.postStart((sw: SampleComponent) =>
-        ZIO.effectTotal(flag.set(true)) *>
-          ZIO.effectTotal(postUsedValue.set(sw.foo.foo))
-      )
-    )
 
-    assert(!runtime.unsafeRun(c))
+    trait SampleComp2 {
+      def x: SampleWiring
+
+      println("Setting flag to true")
+      flag.set(true)
+    }
+
+    val c: URIO[Console, Unit] =
+      (ZIO.environment[SampleComp2] *> putStrLn("CREATED")).unit.injectPrimary
+        .withLifecycle {
+          Lifecycle.postStart((sw: SampleComp2) => ZIO.effectTotal(postUsedValue.set(sw.x.foo)))
+        }
+        .excludeZEnv[Console]
+        .wire
+
+    runtime.unsafeRun(c)
+    assert(flag.get())
     assert(postUsedValue.get() == sampleWiring.foo)
     assert(flag.get())
   }

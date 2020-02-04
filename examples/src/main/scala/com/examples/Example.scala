@@ -2,6 +2,7 @@ package com.examples
 
 import java.nio.file.Paths
 import cakeless._
+import cakeless.nat._
 import zio.console._
 import zio._
 import scala.concurrent.ExecutionContext
@@ -31,7 +32,7 @@ object Example extends App {
       }
     }
 
-    val url = for {
+    val url: ZIO[NestedComponent with AllComponents2 with AllComponents1, IllegalArgumentException, String] = for {
       config <- configValue
       c2     <- component2
       port   <- c2.getConfig(config)("http.port").map(_.getOrElse(80))
@@ -39,10 +40,11 @@ object Example extends App {
     } yield s"$host:$port?token=${c2.token}"
 
 //     todo: uncomment these 3 lines and comment `injectPrimary` to see how specific constructor selection works like
-//        val username: Username = Username("vitaliihonta")
-//        val password: Password = Password("password")
-//        inject(url)(1)
-    injectPrimary(url)
+    val username: Username                          = Username("vitaliihonta")
+    val password: Password                          = Password("password")
+    val wired: IO[IllegalArgumentException, String] = url.inject[_1].wire
+//    val wired: IO[IllegalArgumentException, String] = url.injectPrimary.wire
+    wired
       .catchAll(e => ZIO.succeed(e.getMessage))
       .flatMap(putStrLn) *> ZIO.succeed(0)
   }
