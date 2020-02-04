@@ -1,28 +1,38 @@
 package cakeless.internal
 
-import scala.reflect.macros.{whitebox, TypecheckException}
+import scala.reflect.macros.{blackbox, TypecheckException}
 import zio.blocking.Blocking
 import zio.clock.Clock
 import zio.console.Console
 import zio.random.Random
+import cakeless.nat._
 
-class EnvProvider(override val c: whitebox.Context) extends DependencyResolver(c) {
+class EnvProvider(override val c: blackbox.Context) extends DependencyResolver(c) {
 
   import c.universe._
 
-  def injectPrimaryImpl[R: WeakTypeTag, E: WeakTypeTag, A: WeakTypeTag](instance: Expr[InjectionMagnet[R, E, A]])(exclude: Tree): Tree =
-    injectImpl[R, E, A](instance)(reify(0))(exclude)
+  def mkConstructorImpl[R: WeakTypeTag, T >: R: WeakTypeTag, N <: Nat: WeakTypeTag]: Tree = {
+    val R              = weakTypeOf[R].dealias
+    val N              = weakTypeOf[N].dealias
+    val T              = weakTypeOf[T].dealias
+    val unrefinedT     = unrefine(T).toSet.filterNot(_ =:= any)
+    val depsExclusions = zenvMembers.collect { case (k, _) if unrefinedT.contains(k) => k }.toList
 
-  def injectImpl[R: WeakTypeTag, E: WeakTypeTag, A: WeakTypeTag](instance: Expr[InjectionMagnet[R, E, A]])(constructor: Expr[Int])(exclude: Tree): Tree = {
-    val info = getCakeInfo[R](constructor, refinementExclusions = zenv, depsExclusions = zenvDeps)
+    unrefinedT.collectFirst {
+      case tpe if !zenv.contains(tpe) =>
+        fail(s"Attempt to exclude ($tpe) which is not a part of zio.ZEnv! Please, do it manually")
+    }
+
+    val info = getCakeInfo[R](constructor(N), refinementExclusions = unrefinedT, depsExclusions = depsExclusions.toSet)
     import info._
-    val dependenciesList = collectDependencies(depsTypesList)
+    val dependenciesList = collectDependencies(depsTypesList, depsExclusions)
     ifDebug {
       println(s"Excluded types: $excludedTypes\nexcluded deps: $excludedDeps")
       println(sep)
     }
-//    val depsValueName   = TermName("deps")
-    val instanceName          = TermName(c.freshName("instance"))
+
+    val resultingExclusions = excludedTypes.filter(unrefinedT.contains)
+
     val standardDepName       = TermName(c.freshName("zenv"))
     val passConstructorParams = passConstructorParamsIndexes.map(_.map(dependenciesList(_)))
     val assignmentsWithExclusions = {
@@ -38,31 +48,29 @@ class EnvProvider(override val c: whitebox.Context) extends DependencyResolver(c
       }
       overrides ++ exclusions
     }
-    val refinementsWithExclusions = typeRefinements ++ excludedTypes
+    val refinementsWithExclusions = typeRefinements ++ resultingExclusions
     val envCode                   = q"""new $mainType(...$passConstructorParams) with ..$refinementsWithExclusions { ..$assignmentsWithExclusions }"""
 
-    val createInstanceCode = q"ZIO.effectTotal($envCode)"
-    val provideCode = excludedTypes match {
-      case Nil => q"""$instanceName.provideSome[$any](_ => $createInstanceCode)"""
-      case List(single) =>
+    val createExcluder = excludedTypes match {
+      case Nil =>
         q"""
-          $instanceName.provideSome[$single] { (x: $single) =>
-             val $standardDepName = x
-             $createInstanceCode
+          new _root_.cakeless.internal.EnvConstructor[$R, $N] {
+            type Excluded = $any
+            override def construct(r: Excluded): UIO[$R] = UIO.effectTotal($envCode)
           }
          """
-
-      case head :: rest =>
-        q"""$instanceName.provideSome[$head with ..$rest] { (x: $head with ..$rest) =>
-           val $standardDepName = x
-           $createInstanceCode
-        }"""
+      case _ =>
+        q"""
+           new _root_.cakeless.internal.EnvConstructor[$R, $N] {
+            type Excluded = $T
+            override def construct($standardDepName: Excluded): UIO[$R] = UIO.effectTotal($envCode)
+          }
+         """
     }
 
     val expr = q"""
        import _root_.zio._
-       val $instanceName  = $instance
-       $provideCode
+       $createExcluder
      """
 
     ifDebug {
@@ -82,13 +90,9 @@ class EnvProvider(override val c: whitebox.Context) extends DependencyResolver(c
     typeOf[zio.system.System.Service[_]] -> TermName("system"),
     typeOf[Random.Service[_]]            -> TermName("random"),
     typeOf[Blocking.Service[_]]          -> TermName("blocking")
-  ).map { case (k, v) => k.dealias -> v }
+  ).map { case (k, v) => k.dealias -> v }.toMap
 
-  private val zenvDeps: Set[Type] = {
-    zenvMembers.map(_._1)
-  }
-
-  private def collectDependencies(depsTypes: List[Type]): List[Tree] = {
+  private def collectDependencies(depsTypes: List[Type], exclusions: List[Type]): List[Tree] = {
     val clsBody = enclosingClassBody
     val members = clsBody
       .collect {
@@ -109,7 +113,7 @@ class EnvProvider(override val c: whitebox.Context) extends DependencyResolver(c
 
     val depsWithImpls: List[(Type, Tree)] = for {
       dep <- depsTypes
-      if !zenvDeps.exists(dep.<:<)
+      if !exclusions.exists(dep.<:<)
     } yield {
       members.filter(_.symbol.typeSignature =:= dep) match {
         case List(ValDef(_, _, _, impl)) => dep -> impl
@@ -144,5 +148,18 @@ class EnvProvider(override val c: whitebox.Context) extends DependencyResolver(c
         .takeWhile(_.pos.line <= c.enclosingPosition.line)
     }).distinct
 
-  private val any = typeOf[Any].dealias
+  private val any  = typeOf[Any].dealias
+  private val Zero = typeOf[_0].dealias
+  private val Inc  = typeOf[Nat.Inc[_0]].dealias
+
+  private def constructor(N: Type): Int =
+    if (N =:= Zero) 0
+    else if (N <:< Inc) {
+      N.typeArgs match {
+        case List(n) => 1 + constructor(n)
+        case _       => fail(s"Internal error: unknown Nat case of $N, expected either Zero or Inc")
+      }
+    } else {
+      fail(s"Internal error: unknown Nat case of $N, expected either Zero or Inc")
+    }
 }

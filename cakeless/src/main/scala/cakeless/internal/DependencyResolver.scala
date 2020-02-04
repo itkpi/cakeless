@@ -2,14 +2,14 @@ package cakeless.internal
 
 import japgolly.microlibs.macro_utils.MacroUtils
 import scala.language.experimental.macros
-import scala.reflect.macros.whitebox
+import scala.reflect.macros.blackbox
 
 /**
   * Whitebox-macro magic
   * picking up cake dependencies on the type level
   * and generating wiring code (like macwire does).
  **/
-abstract class DependencyResolver(val c: whitebox.Context) extends MacroUtils {
+abstract class DependencyResolver(val c: blackbox.Context) extends MacroUtils {
 
   import c.universe._
 
@@ -25,7 +25,7 @@ abstract class DependencyResolver(val c: whitebox.Context) extends MacroUtils {
       excludedDeps: List[MethodSymbol]
   )
 
-  protected val debug = sys.env.getOrElse("cakeless_macro_debug", "false").toBoolean
+  protected val debug: Boolean = sys.env.getOrElse("cakeless_macro_debug", "false").toBoolean
 
   protected def assertMacro(cond: Boolean, msg: String): Unit =
     if (!cond) c.abort(c.enclosingPosition, msg)
@@ -39,19 +39,11 @@ abstract class DependencyResolver(val c: whitebox.Context) extends MacroUtils {
   }
 
   protected def getCakeInfo[A: WeakTypeTag](
-      constructor: Expr[Int],
+      constructor: Int,
       refinementExclusions: Set[Type],
       depsExclusions: Set[Type]
   ): CakeInfo = {
     val A = weakTypeOf[A].dealias
-
-    val constNum: Int = constructor match {
-      case Expr(Literal(Constant(n: Int))) =>
-        assertMacro(n >= 0, s"`constructor` should not be less than 0")
-        n
-      case _ =>
-        fail(s"`constructor` must be constant Int! Given: $constructor")
-    }
 
     val (mainType, refinements, excludedTypes) = A match {
       case RefinedType(types, x) =>
@@ -91,7 +83,7 @@ abstract class DependencyResolver(val c: whitebox.Context) extends MacroUtils {
 
     val constructorParams = {
       if (mainType.decls.exists(s => s.isMethod && s.asMethod.isConstructor)) {
-        if (constNum == 0)
+        if (constructor == 0)
           mainType.decls
             .collectFirst { case m: MethodSymbol if m.isPrimaryConstructor => m }
             .getOrElse(fail("Unable to discern primary constructor."))
@@ -100,20 +92,21 @@ abstract class DependencyResolver(val c: whitebox.Context) extends MacroUtils {
           val constructorsList = mainType.decls.collect { case m: MethodSymbol if m.isConstructor => m }.toList
 
           assertMacro(
-            constNum < constructorsList.size,
-            s"Chosen $constNum constructor but found only ${constructorsList.size} constructors"
+            constructor < constructorsList.size,
+            s"Chosen $constructor constructor but found only ${constructorsList.size} constructors"
           )
 
-          constructorsList(constNum).paramLists
+          constructorsList(constructor).paramLists
         }
       } else {
-        if (constNum > 0) c.warning(c.enclosingPosition, s"$mainType doesn't have constructors at all but requested #$constNum constructor")
+        if (constructor > 0)
+          c.warning(c.enclosingPosition, s"$mainType doesn't have constructors at all but requested #$constructor constructor")
         Nil
       }
     }
 
     ifDebug {
-      println(s"#$constNum constructor params: $constructorParams")
+      println(s"#$constructor constructor params: $constructorParams")
       println(sep)
     }
 
@@ -167,7 +160,7 @@ abstract class DependencyResolver(val c: whitebox.Context) extends MacroUtils {
     )
   }
 
-  private def unrefine(tpe: Type): List[Type] = tpe match {
+  protected def unrefine(tpe: Type): List[Type] = tpe match {
     case RefinedType(types, _) => types.flatMap(unrefine)
     case _                     => List(tpe)
   }

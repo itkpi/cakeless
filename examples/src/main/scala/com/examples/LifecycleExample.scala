@@ -2,8 +2,6 @@ package com.examples
 
 import java.nio.file.Paths
 import cakeless._
-import cakeless.internal.{InjectionMagnet, ZEnvExcluder}
-import cakeless.internal.InjectionMagnet.Aux
 import com.examples.types.{ConfigPath, Props}
 import com.typesafe.config.{Config, ConfigException}
 import zio._
@@ -17,17 +15,21 @@ object LifecycleExample extends App {
   val props: Props           = Props(Map("host" -> "localhost"))
   val db: Database           = new Database
 
-  def run(args: List[String]): ZIO[ZEnv, Nothing, Int] = {
-    val comp1: ZIO[Console, ConfigException, Config] = injectPrimary(
-      ZIO.accessM[AllComponents1](_.getConfigFile).tap(c => putStrLn(c.toString)),
-      Lifecycle
-        .preStart(
-          putStrLn("Component 1 preStart")
+  def run(args: List[String]): ZIO[zio.ZEnv, Nothing, Int] = {
+    val comp1: ZIO[Console, ConfigException, Config] =
+      ZIO
+        .accessM[AllComponents1](_.getConfigFile)
+        .tap(c => putStrLn(c.toString))
+        .injectPrimary
+        .withLifecycle(
+          Lifecycle.preStart(
+            putStrLn("Component 1 preStart")
+          ) && Lifecycle.postStart(
+            putStrLn("Component 1 started!")
+          )
         )
-        .postStart(
-          putStrLn("Component 1 started!")
-        )
-    )
+        .excludeZEnv[Console]
+        .wire
 
     val program: ZIO[Console with Random, ConfigException, String] = comp1.flatMap { config =>
       val table = config.getString("table")
@@ -37,16 +39,16 @@ object LifecycleExample extends App {
           .catchAll(e => ZIO.succeed(e.getMessage))
       }
 
-      val lifecycle: Lifecycle[Any, Console with Random, DbComponent] = Lifecycle.postStart { (comp2: DbComponent) =>
-        val open = putStrLn("Opening connection with DB...") *> comp2.db.openConnection()
+      getFromDb.injectPrimary
+        .withLifecycle {
+          Lifecycle.postStart { comp2: DbComponent =>
+            val open = putStrLn("Opening connection with DB...") *> comp2.db.openConnection()
 
-        open.retry(Schedule.recurs(10)).orDie
-      }
-
-
-      val xx = ZEnvExcluder.excludeRight[AllComponents2 with DbComponent with Console with Random, Console with Random]
-      val y = injectPrimary(getFromDb, lifecycle)
-      y
+            open.retry(Schedule.recurs(10)).orDie
+          }
+        }
+        .excludeZEnv[Console with Random]
+        .wire
     }
 
     program.fold(_ => 1, _ => 0)
