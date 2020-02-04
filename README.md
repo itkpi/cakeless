@@ -1,6 +1,6 @@
 ---
 Project: Cakeless
-Current version: 1.0.0-rc2-SNAPSHOT
+Current version: 1.0.0-SNAPSHOT
 Scala version: 2.12.10, 2.13.1
 ---
 
@@ -17,7 +17,7 @@ To try it, add the following into your `build.sbt` file:
 resolvers += "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"
 
 libraryDependencies ++= {
-  val cakelessV = "1.0.0-rc2-SNAPSHOT"
+  val cakelessV = "1.0.0-SNAPSHOT"
   Seq(
     "ua.pp.itkpi" %% "cakeless" % cakelessV
   )
