@@ -45,10 +45,15 @@ abstract class DependencyResolver(val c: blackbox.Context) extends MacroUtils {
   ): CakeInfo = {
     val A = weakTypeOf[A].dealias
 
-    val (mainType, refinements, excludedTypes) = A match {
-      case RefinedType(types, x) =>
+    val (mainType, refinements, excludedTypes) = unrefine(A) match {
+      case A =>
+        val withSelfTypes = unrefine(A.typeSymbol.asClass.selfType).distinct.flatMap(unrefine).filterNot(isAny)
+        val excl          = withSelfTypes.filter(tpe => refinementExclusions.exists(tpe.<:<)).distinct.flatMap(unrefine)
+        (A, withSelfTypes, excl)
+
+      case types =>
         val (excl, withExcludedTypes) =
-          types.flatMap(unrefine).distinct.filterNot(isAny).partition(tpe => refinementExclusions.exists(tpe.<:<))
+          types.distinct.filterNot(isAny).partition(tpe => refinementExclusions.exists(tpe.<:<))
         val withSelfTypes = withExcludedTypes.map(_.typeSymbol.asClass.selfType).flatMap(unrefine).distinct
         val mt = withExcludedTypes
           .find(isClass)
@@ -57,10 +62,6 @@ abstract class DependencyResolver(val c: blackbox.Context) extends MacroUtils {
             fail(s"Type $A is a refined type containing only one of $refinementExclusions")
           }
         (mt, withSelfTypes, excl.flatMap(unrefine))
-      case _ =>
-        val withSelfTypes = unrefine(A.typeSymbol.asClass.selfType).distinct.flatMap(unrefine).filterNot(isAny)
-        val excl          = withSelfTypes.filter(tpe => refinementExclusions.exists(tpe.<:<)).distinct.flatMap(unrefine)
-        (A, withSelfTypes, excl)
     }
 
     val abstractValues = refinements
@@ -68,11 +69,6 @@ abstract class DependencyResolver(val c: blackbox.Context) extends MacroUtils {
       .filterNot(v => depsExclusions.exists(v.returnType.<:<))
 
     val excludedMembers = excludedTypes.flatMap(getNullaryAbstractMethods)
-
-    assertMacro(
-      abstractValues.nonEmpty,
-      s"There is no sense in cakeless for $A because it doesn't have parameter-less abstract val's or def's"
-    )
 
     val abstractMembersReturnTypes = abstractValues.map(_.returnType)
 
