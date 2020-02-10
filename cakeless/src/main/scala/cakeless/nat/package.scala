@@ -1,5 +1,6 @@
 package cakeless
 
+/** Nat instances (0 to 10) */
 package object nat {
   type _0  = Nat.Zero
   type _1  = Nat.Inc[_0]
