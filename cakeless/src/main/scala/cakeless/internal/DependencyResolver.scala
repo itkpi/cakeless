@@ -13,9 +13,12 @@ abstract class DependencyResolver(val c: blackbox.Context) extends MacroUtils {
 
   import c.universe._
 
+  case class ConstructorParamInfo(constructorNumber: Int)
+  case class Dependency(prefixType: Type, name: Name, tpe: Type, constructorInfo: Option[ConstructorParamInfo])
+
   case class CakeInfo(
       A: Type,
-      depsTypesList: List[Type],
+      depsTypesList: List[Dependency],
       depsValueName: TermName,
       mainType: Type,
       passConstructorParamsIndexes: List[List[Int]],
@@ -65,12 +68,16 @@ abstract class DependencyResolver(val c: blackbox.Context) extends MacroUtils {
     }
 
     val abstractValues = refinements
-      .flatMap(getNullaryAbstractMethods)
-      .filterNot(v => depsExclusions.exists(v.returnType.<:<))
+      .map(tpe => tpe -> getNullaryAbstractMethods(tpe).filterNot(v => depsExclusions.exists(v.returnType.<:<)))
 
     val excludedMembers = excludedTypes.flatMap(getNullaryAbstractMethods)
 
-    val abstractMembersReturnTypes = abstractValues.map(_.returnType)
+    val abstractMembers = {
+      for {
+        (prefixType, avs) <- abstractValues
+        av                <- avs
+      } yield Dependency(prefixType = prefixType, name = av.name, tpe = av.returnType, constructorInfo = None)
+    }
 
     ifDebug {
       println(s"Main type: $mainType")
@@ -106,7 +113,16 @@ abstract class DependencyResolver(val c: blackbox.Context) extends MacroUtils {
       println(sep)
     }
 
-    val allParamsList = constructorParams.flatMap(_.map(_.typeSignature.dealias)) ++ abstractMembersReturnTypes
+    val allParamsList = constructorParams.flatMap(
+      _.map(s =>
+        Dependency(
+          prefixType = mainType,
+          name = s.name,
+          tpe = s.typeSignature.dealias,
+          constructorInfo = Some(ConstructorParamInfo(constructorNumber = constructor))
+        )
+      )
+    ) ++ abstractMembers
 
     val typeRefinements = refinements.flatMap(extractClassesChain).filterNot(_ <:< mainType).distinct
 
@@ -132,7 +148,7 @@ abstract class DependencyResolver(val c: blackbox.Context) extends MacroUtils {
     }
 
     val assignmentIndexes = {
-      abstractValues.zipWithIndex.map {
+      abstractValues.flatMap(_._2).zipWithIndex.map {
         case (method, idx) =>
           (method.name, abstractValuesOffset + idx)
       }

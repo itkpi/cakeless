@@ -1,5 +1,7 @@
 package cakeless.internal
 
+import cakeless.{wired, ConflictResolution}
+
 import scala.reflect.macros.{blackbox, TypecheckException}
 import zio.blocking.Blocking
 import zio.clock.Clock
@@ -11,12 +13,17 @@ class EnvProvider(override val c: blackbox.Context) extends DependencyResolver(c
 
   import c.universe._
 
-  def mkConstructorImpl[R: WeakTypeTag, T >: R: WeakTypeTag, N <: Nat: WeakTypeTag]: Tree = {
+  def mkConstructorImpl[R: WeakTypeTag, T >: R: WeakTypeTag, N <: Nat: WeakTypeTag, CR <: ConflictResolution: WeakTypeTag]: Tree = {
     val R              = weakTypeOf[R].dealias
     val N              = weakTypeOf[N].dealias
     val T              = weakTypeOf[T].dealias
+    val CR             = weakTypeOf[CR].dealias
     val unrefinedT     = unrefine(T).toSet.filterNot(_ =:= any)
     val depsExclusions = zenvMembers.collect { case (k, _) if unrefinedT.contains(k) => k }.toList
+    val resolution = CR match {
+      case RaiseResolution => ConflictResolution.Raise
+      case WarnResolution  => ConflictResolution.Warn
+    }
 
     unrefinedT.collectFirst {
       case tpe if !zenv.contains(tpe) =>
@@ -25,7 +32,7 @@ class EnvProvider(override val c: blackbox.Context) extends DependencyResolver(c
 
     val info = getCakeInfo[R](constructor(N), refinementExclusions = unrefinedT, depsExclusions = depsExclusions.toSet)
     import info._
-    val dependenciesList = collectDependencies(depsTypesList, depsExclusions)
+    val dependenciesList = collectDependencies(depsTypesList, depsExclusions, resolution)
     ifDebug {
       println(s"Excluded types: $excludedTypes\nexcluded deps: $excludedDeps")
       println(sep)
@@ -54,14 +61,14 @@ class EnvProvider(override val c: blackbox.Context) extends DependencyResolver(c
     val createExcluder = excludedTypes match {
       case Nil =>
         q"""
-          new _root_.cakeless.internal.EnvConstructor[$R, $N] {
+          new _root_.cakeless.internal.EnvConstructor[$R, $N, $CR] {
             type Excluded = $any
             override def construct(r: Excluded): UIO[$R] = UIO.effectTotal($envCode)
           }
          """
       case _ =>
         q"""
-           new _root_.cakeless.internal.EnvConstructor[$R, $N] {
+           new _root_.cakeless.internal.EnvConstructor[$R, $N, $CR] {
             type Excluded = $T
             override def construct($standardDepName: Excluded): UIO[$R] = UIO.effectTotal($envCode)
           }
@@ -92,38 +99,47 @@ class EnvProvider(override val c: blackbox.Context) extends DependencyResolver(c
     typeOf[Blocking.Service[_]]          -> TermName("blocking")
   ).map { case (k, v) => k.dealias -> v }.toMap
 
-  private def collectDependencies(depsTypes: List[Type], exclusions: List[Type]): List[Tree] = {
-    val clsBody = enclosingClassBody
-    val members = clsBody
-      .collect {
-        case valDef: ValDef => valDef
-      }
-      .filterNot(_.rhs.isEmpty)
-    //      .map(c.typecheck(_)) // todo: probably delete later
+  private def collectDependencies(dependencies: List[Dependency], exclusions: List[Type], resolution: ConflictResolution): List[Tree] = {
+    val members = enclosingClassBody
+      .collect { case valDef: ValDef => valDef }
+    //      .filterNot(_._1.rhs.isEmpty) todo: probably delete later
+    //      .map(c.typecheck(_)) //
     //      .filterNot(_.tpe == null)
 
     ifDebug {
       println(s"""
            |Attempting to automatically wire dependencies...
            |defined values: $members
-           |types: ${members.map(_.symbol.typeSignature)}
-           |deps: $depsTypes
+           |types: ${members.map { _.symbol.typeSignature }}
+           |deps: $dependencies
       """.stripMargin)
     }
 
     val depsWithImpls: List[(Type, Tree)] = for {
-      dep <- depsTypes
-      if !exclusions.exists(dep.<:<)
+      dependency @ Dependency(_, _, depTpe, _) <- dependencies
+      if !exclusions.exists(depTpe.<:<)
     } yield {
-      members.filter(_.symbol.typeSignature =:= dep) match {
-        case List(ValDef(_, _, _, impl)) => dep -> impl
+      members.filter { _.symbol.typeSignature =:= depTpe } match {
+        case List(valDef) =>
+          depTpe -> selectDep(valDef, dependency, resolution)
         case Nil =>
-          try dep -> c.typecheck(q"implicitly[$dep]")
+          try depTpe -> c.typecheck(q"implicitly[$depTpe]")
           catch {
-            case e: TypecheckException => fail(s"Not found value of type $dep in scope")
+            case e: TypecheckException => fail(s"Not found value of type $depTpe in scope")
           }
 
-        case multiple => fail(s"Found multiple values of type $dep:\n\t${multiple.mkString("\n\tand ")}\n\n")
+        case multiple =>
+          multiple filter {
+            case ValDef(mods, _, _, _) => mods.annotations.exists(ann => c.typecheck(ann, c.TYPEmode).tpe =:= WiredAnnotation)
+          } match {
+            case List(valDef) => depTpe -> selectDep(valDef, dependency, resolution)
+            case _            => fail(s"""
+                 |Found multiple values of type $depTpe:
+                 |${multiple.mkString("\n\tand ")}.
+                 |You may choose one of them by just annotating it with @wired annotation
+                 |""".stripMargin)
+          }
+
       }
     }
 
@@ -133,13 +149,52 @@ class EnvProvider(override val c: blackbox.Context) extends DependencyResolver(c
     depsWithImpls.map(_._2)
   }
 
-  private def enclosingClassBody: List[Tree] =
-    ((c.enclosingClass match {
-      case ClassDef(_, _, _, Template(parents, _, body)) => parents ++ body
-      case ModuleDef(_, _, Template(parents, _, body))   => parents ++ body
+  private def selectDep(valDef: ValDef, dependency: Dependency, resolution: ConflictResolution): Tree = {
+    import dependency.{prefixType, name => depName, tpe => depTpe, constructorInfo}
+    import valDef.name
+
+    def baseMessage: String = {
+      val recommendedName =
+        if (!(depName.toString.toLowerCase endsWith "impl")) s"${depName}Impl"
+        else s"${depName}0"
+
+      val fileLink = s"${valDef.pos.source.file}:${valDef.pos.line}:${valDef.pos.column}"
+      s"""
+           |Dependency `$depName` of type $depTpe (in type $prefixType) has the same name
+           |as value `$name` (member of $enclosingCls, $fileLink).
+           |For cake-pattern it may cause StackOverflowError due to cyclic reference.
+           |It's better to rename `$depName` to (for instance) `$recommendedName`""".stripMargin
+    }
+
+    if (depName == name && constructorInfo.isEmpty) resolution match {
+      case ConflictResolution.Raise =>
+        fail(
+          s"""
+               |$baseMessage
+               |If you are sure what you're doing, use `.warnConflicts` on your EnvInjector
+               |""".stripMargin
+        )
+      case ConflictResolution.Warn =>
+        warn(
+          s"""
+               |$baseMessage
+               |If you are not sure what you're doing, use `.raiseOnConflicts` on your EnvInjector  
+               |""".stripMargin
+        )
+        q"$name"
+    }
+    else q"$name"
+  }
+
+  private val (enclosingCls, enclosingClassBody) = {
+    val (cls, body) = c.enclosingClass match {
+      case ClassDef(_, name, _, Template(parents, _, body)) => name.toTermName -> (parents ++ body)
+      case ModuleDef(_, name, Template(parents, _, body))   => name            -> (parents ++ body)
       case e =>
         fail(s"Unknown type of enclosing class: ${e.getClass}")
-    }) ++ {
+    }
+
+    cls -> (body ++ {
       val DefDef(_, _, _, _, _, body) = c.enclosingDef
       body
         .collect {
@@ -147,10 +202,14 @@ class EnvProvider(override val c: blackbox.Context) extends DependencyResolver(c
         }
         .takeWhile(_.pos.line <= c.enclosingPosition.line)
     }).distinct
+  }
 
-  private val any  = typeOf[Any].dealias
-  private val Zero = typeOf[_0].dealias
-  private val Inc  = typeOf[Nat.Inc[_0]].dealias
+  private val any             = typeOf[Any].dealias
+  private val Zero            = typeOf[_0].dealias
+  private val Inc             = typeOf[Nat.Inc[_0]].dealias
+  private val RaiseResolution = typeOf[ConflictResolution.Raise].dealias
+  private val WarnResolution  = typeOf[ConflictResolution.Warn].dealias
+  private val WiredAnnotation = typeOf[wired].dealias
 
   private def constructor(N: Type): Int =
     if (N =:= Zero) 0

@@ -11,9 +11,9 @@ import scala.concurrent.ExecutionContext
 import ExecutionContext.Implicits.global
 
 object LifecycleExample extends App {
-  val configPath: ConfigPath = ConfigPath(Paths.get("./examples/src/main/resources/application.conf"))
-  val props: Props           = Props(Map("host" -> "localhost"))
-  val db: Database           = new Database
+  val configPathImpl: ConfigPath = ConfigPath(Paths.get("./examples/src/main/resources/application.conf"))
+  val propsImpl: Props           = Props(Map("host" -> "localhost"))
+  val dbImpl: Database           = new Database
 
   def run(args: List[String]): ZIO[zio.ZEnv, Nothing, Int] = {
     val comp1: ZIO[Console, ConfigException, Config] =
