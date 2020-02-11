@@ -24,4 +24,6 @@ libraryDependencies ++= {
 }
 ```
 
+Docs are available [here](./docs/readme.md)
+
 Check examples [here](./examples/src/main/scala/com/examples)

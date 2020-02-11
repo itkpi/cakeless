@@ -46,19 +46,33 @@ lazy val examples = project
     libraryDependencies ++= Seq(
       Config.typesafe,
       Tagging.supertagged
-    )
+    ),
+    coverageEnabled := false
   )
   .withCommonSettings()
 
+lazy val docs = project
+  .in(file("cakeless-docs"))
+  .settings(
+    mdocVariables := Map(
+      "VERSION" -> version.value
+    ),
+    coverageEnabled := false,
+    libraryDependencies ++= Seq(
+      Config.typesafe,
+      Tagging.supertagged
+    )
+  )
+  .dependsOn(cakeless)
+  .enablePlugins(MdocPlugin)
+
 lazy val root = project
   .in(file("."))
-  .aggregate(cakeless, examples)
+  .aggregate(cakeless, examples, docs)
   .settings(
     name := "cakeless-new-root",
     skip in publish := true,
     publish := {},
-    publishLocal := {},
-    coverageExcludedPackages := ".*operations.*",
-    coverageExcludedFiles := ".*orderingInstances | .*arrows* | .*ToCaseClass*"
+    publishLocal := {}
   )
   .withCommonSettings()
