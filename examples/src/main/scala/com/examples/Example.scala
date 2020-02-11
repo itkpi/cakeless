@@ -10,8 +10,8 @@ import ExecutionContext.Implicits.global
 import types._
 
 object Example extends App {
-  @wired val propsProd: Props = Props(Map("host" -> "4.4.4.4"))
-  val props: Props            = Props(Map("host" -> "localhost"))
+  val propsProd: Props        = Props(Map("host" -> "4.4.4.4"))
+  @wired val propsTest: Props = Props(Map("host" -> "localhost")) // todo: you may annotate propsProd instead any see what happens :)
 
   val configPathProd: ConfigPath = ConfigPath(Paths.get("./examples/src/main/resources/application.conf"))
   implicit val token: Token      = Token("safjginkl352")
@@ -42,11 +42,11 @@ object Example extends App {
     } yield s"$host:$port?token=${c2.token}"
 
 //     todo: uncomment these 3 lines and comment `injectPrimary` to see how specific constructor selection works like
-//    val username: Username                          = Username("vitaliihonta")
-//    val password: Password                          = Password("password")
-//    val wired: IO[IllegalArgumentException, String] = url.inject[_1].wire
+    val username: Username                          = Username("vitaliihonta")
+    val password: Password                          = Password("password")
+    val wired: IO[IllegalArgumentException, String] = url.inject[_1].wire
 
-    val wired: IO[IllegalArgumentException, String] = url.injectPrimary.wire
+//    val wired: IO[IllegalArgumentException, String] = url.injectPrimary.wire
     wired
       .catchAll(e => ZIO.succeed(e.getMessage))
       .flatMap(putStrLn) *> ZIO.succeed(0)

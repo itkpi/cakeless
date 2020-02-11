@@ -55,19 +55,19 @@ class NestedComponent(implicit val token: Token) {
 
 class ConnectionFailureException(msg: String) extends Exception(msg)
 
-class Database {
+class Database(url: DbUrl) {
   def openConnection(): ZIO[Console with Random, ConnectionFailureException, Unit] =
     nextBoolean.flatMap {
-      case true  => ZIO.fail(new ConnectionFailureException("Unable to open connection to DB..."))
-      case false => putStrLn("Opened connection with DB")
+      case true  => ZIO.fail(new ConnectionFailureException(s"Unable to open connection to DB $url ..."))
+      case false => putStrLn(s"Opened connection with DB $url")
     }
 
   def runSql(sql: String): Task[String] = Task {
-    println(s"EXECUTING: $sql")
+    println(s"[DB $url] EXECUTING: $sql")
     "1"
   }
 
-  def close(): URIO[Console, Unit] = putStrLn("Closed connenction with DB!")
+  def close(): URIO[Console, Unit] = putStrLn(s"Closed connenction with DB $url!")
 }
 
 trait DbComponent {

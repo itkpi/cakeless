@@ -1,6 +1,6 @@
 ---
 Project: Cakeless
-Current version: 1.0.0-SNAPSHOT
+Current version: 1.0.0-rc3
 Scala version: 2.12.10, 2.13.1
 ---
 
@@ -10,14 +10,14 @@ Scala version: 2.12.10, 2.13.1
 
 # cakeless
 
-Cakeless is library providing ability to painlessly wire deeply nested cakes into your ZIO environment.
+Cakeless is a library providing the ability to painlessly wire deeply nested cakes into your ZIO environment.
 
 To try it, add the following into your `build.sbt` file:
 ```scala
 resolvers += "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"
 
 libraryDependencies ++= {
-  val cakelessV = "1.0.0-SNAPSHOT"
+  val cakelessV = "1.0.0-rc3"
   Seq(
     "ua.pp.itkpi" %% "cakeless" % cakelessV
   )

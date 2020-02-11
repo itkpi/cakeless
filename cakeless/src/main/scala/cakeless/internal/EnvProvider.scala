@@ -102,6 +102,7 @@ class EnvProvider(override val c: blackbox.Context) extends DependencyResolver(c
   private def collectDependencies(dependencies: List[Dependency], exclusions: List[Type], resolution: ConflictResolution): List[Tree] = {
     val members = enclosingClassBody
       .collect { case valDef: ValDef => valDef }
+      .filterNot(_.mods.hasFlag(Flag.SYNTHETIC))
     //      .filterNot(_._1.rhs.isEmpty) todo: probably delete later
     //      .map(c.typecheck(_)) //
     //      .filterNot(_.tpe == null)

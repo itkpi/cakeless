@@ -18,4 +18,7 @@ object types {
 
   object Password extends TaggedType[String]
   type Password = Password.Type
+
+  object DbUrl extends TaggedType[String]
+  type DbUrl = DbUrl.Type
 }

@@ -1,4 +1,4 @@
-import Dependencies._
+import BuildConfig._
 
 lazy val scalaReflect = Def.setting {
   "org.scala-lang" % "scala-reflect" % scalaVersion.value
@@ -18,9 +18,6 @@ def sonatypeProject(id: String, base: File) =
       name := id,
       resolvers += Resolver.sonatypeRepo("releases"),
       libraryDependencies ++= Seq(
-        Testing.scalactic,
-        Testing.scalatest,
-        Macros.simulacrum,
         Macros.resetallattrs
       )
     )
@@ -32,11 +29,11 @@ lazy val cakeless = sonatypeProject(id = "cakeless", base = file("./cakeless"))
     libraryDependencies ++= {
       Seq(
         Macros.utils,
-        Zio.zio,
-        Testing.mockito
+        Zio.zio
       )
     }
   )
+  .withZioTest()
 
 lazy val examples = project
   .in(file("./examples"))
@@ -53,7 +50,8 @@ lazy val examples = project
   )
   .withCommonSettings()
 
-lazy val root = project.in(file("."))
+lazy val root = project
+  .in(file("."))
   .aggregate(cakeless, examples)
   .settings(
     name := "cakeless-new-root",

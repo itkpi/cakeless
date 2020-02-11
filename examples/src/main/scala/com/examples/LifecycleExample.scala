@@ -1,8 +1,9 @@
 package com.examples
 
 import java.nio.file.Paths
+
 import cakeless._
-import com.examples.types.{ConfigPath, Props}
+import com.examples.types.{ConfigPath, DbUrl, Props}
 import com.typesafe.config.{Config, ConfigException}
 import zio._
 import zio.console._
@@ -13,9 +14,9 @@ import ExecutionContext.Implicits.global
 object LifecycleExample extends App {
   val configPathImpl: ConfigPath = ConfigPath(Paths.get("./examples/src/main/resources/application.conf"))
   val propsImpl: Props           = Props(Map("host" -> "localhost"))
-  val dbImpl: Database           = new Database
+  val dbUrl: DbUrl               = DbUrl("jdbc:postgresql://localhost:5432/my_db")
 
-  def run(args: List[String]): ZIO[zio.ZEnv, Nothing, Int] = {
+  def run(args: List[String]): ZIO[ZEnv, Nothing, Int] = {
     val comp1: ZIO[Console, ConfigException, Config] =
       ZIO
         .accessM[AllComponents1](_.getConfigFile)
@@ -31,15 +32,24 @@ object LifecycleExample extends App {
         .excludeZEnv[Console]
         .wire
 
-    val program: ZIO[Console with Random, ConfigException, String] = comp1.flatMap { config =>
+    val databaseManaged: URManaged[Console, Database] = ZManaged
+      .make[Console, Nothing, Database](
+        ZIO.effectTotal(new Database(dbUrl))
+      )(release = _.close())
+
+    val selectionIO = comp1.flatMap { config =>
       val table = config.getString("table")
-      val getFromDb: URIO[AllComponents2 with DbComponent, String] = ZIO.accessM[AllComponents2 with DbComponent] { c2 =>
+      ZIO.accessM[DbComponent with Console] { c2 =>
         c2.db
           .runSql(s"SELECT * FROM $table")
-          .catchAll(e => ZIO.succeed(e.getMessage))
+          .catchAll(e => ZIO.succeed(e.getMessage)) >>= putStrLn
       }
+    }
 
-      getFromDb.injectPrimary
+    val program: ZManaged[Console with Random, ConfigException, Unit] = databaseManaged.flatMap { database =>
+      ZManaged
+        .fromEffect(selectionIO)
+        .injectPrimary
         .withLifecycle {
           Lifecycle.postStart { comp2: DbComponent =>
             val open = putStrLn("Opening connection with DB...") *> comp2.db.openConnection()
@@ -51,6 +61,6 @@ object LifecycleExample extends App {
         .wire
     }
 
-    program.fold(_ => 1, _ => 0)
+    program.use(_ => putStrLn("DONE")).fold(_ => 1, _ => 0)
   }
 }
