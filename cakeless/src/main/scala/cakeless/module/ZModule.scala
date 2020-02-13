@@ -15,29 +15,32 @@ sealed trait ZModule[-R, +E, +A] {
   def environment: ZManaged[R, E, A] = ZModule.toZManaged(this)
 }
 
-trait ModuleDecl[+E0, +A0] extends ZModule[Any, E0, A0] {
-  final type E     = E0 @uncheckedVariance
-  final type Wired = A0 @uncheckedVariance
+trait ZModuleDecl[-Rx, +Ex, +Ax] extends ZModule[Rx, Ex, Ax] {
+  final type R     = Rx @uncheckedVariance
+  final type E     = Ex @uncheckedVariance
+  final type Wired = Ax @uncheckedVariance
   final type Decl  = this.type
 
-  override final def flatMap[R1 <: Any, E1 >: E0, B](f: A0 => ZModule[R1, E1, B]): ZModule[R1, E1, B] =
+  override def flatMap[R1 <: Rx, E1 >: Ex, B](f: Ax => ZModule[R1, E1, B]): ZModule[R1, E1, B] =
     ZModule.FlatMapFn(this, f)
 
-  override final def provideSomeM[R0, E1 >: E0](r0: ZIO[R0, E1, Any])(implicit ev: NeedsEnv[Any]): ZModule[R0, E1, A0] =
+  override def provideSomeM[R0, E1 >: Ex](r0: ZIO[R0, E1, Rx])(implicit ev: NeedsEnv[Rx]): ZModule[R0, E1, Ax] =
     new ZModule.Managed(ZManaged.fromEffect(r0).flatMap(environment.provide))
-
 }
 
-class ModuleBuilder[E, A](val `env`: Managed[E, A]) extends AnyVal
+trait ModuleDecl[+Ex, +Ax]   extends ZModuleDecl[Any, Ex, Ax]
+trait RModuleDecl[-Rx, +Ax]  extends ZModuleDecl[Rx, Throwable, Ax]
+trait UModuleDecl[+Ax]       extends ZModuleDecl[Any, Nothing, Ax]
+trait URModuleDecl[-Rx, +Ax] extends ZModuleDecl[Rx, Nothing, Ax]
 
-class ModuleDefn[E, A](builder: ModuleBuilder[E, A]) extends ModuleDecl[E, A] {
-  final override def environment: Managed[E, A] = builder.`env`
+class ModuleDefn[R, E, A](builder: ModuleBuilder[R, E, A]) extends ZModuleDecl[R, E, A] {
+  final override def environment: ZManaged[R, E, A] = builder.`env`
 }
 
 object Limits extends ModuleDecl[Throwable, Int]
 object LimitsImpl
     extends ModuleDefn(
-      of(Limits) {
+      of(Limits).apply {
         ZManaged.fromEffect {
           ZIO(1)
         }
@@ -45,7 +48,7 @@ object LimitsImpl
     )
 
 object Foo {
-  val x: Module[Throwable, Int] = LimitsImpl.map(_ + 1)
+  val x: Module[Throwable, Int] = LimitsImpl
 }
 
 object ZModule {
@@ -58,7 +61,7 @@ object ZModule {
   def fromManaged[R, E, A](managed: ZManaged[R, E, A]): ZModule[R, E, A] = new ZModule.Managed(managed)
 
   private[cakeless] def toZManaged[R, E, A](module: ZModule[R, E, A]): ZManaged[R, E, A] = module match {
-    case decl: ModuleDecl[E, A]            => decl.environment
+    case decl: ZModuleDecl[R, E, A]        => decl.environment
     case ZModule.Succeed(value)            => ZManaged.succeed(value)
     case ZModule.Fail(e)                   => ZManaged.fail(e)
     case ZModule.Effect(zio)               => ZManaged.fromEffect(zio)

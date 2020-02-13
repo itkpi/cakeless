@@ -100,18 +100,15 @@ class EnvProvider(override val c: blackbox.Context) extends DependencyResolver(c
   ).map { case (k, v) => k.dealias -> v }.toMap
 
   private def collectDependencies(dependencies: List[Dependency], exclusions: List[Type], resolution: ConflictResolution): List[Tree] = {
-    val members = enclosingClassBody
-      .collect { case valDef: ValDef => valDef }
-      .filterNot(_.mods.hasFlag(Flag.SYNTHETIC))
-    //      .filterNot(_._1.rhs.isEmpty) todo: probably delete later
-    //      .map(c.typecheck(_)) //
-    //      .filterNot(_.tpe == null)
+//    ifDebug {
+    println(vals.mkString("\n"))
+//    }
 
     ifDebug {
       println(s"""
            |Attempting to automatically wire dependencies...
-           |defined values: $members
-           |types: ${members.map { _.symbol.typeSignature }}
+           |defined values: $vals
+           |types: ${vals.map { _.valDef.symbol.typeSignature }}
            |deps: $dependencies
       """.stripMargin)
     }
@@ -120,9 +117,9 @@ class EnvProvider(override val c: blackbox.Context) extends DependencyResolver(c
       dependency @ Dependency(_, _, depTpe, _) <- dependencies
       if !exclusions.exists(depTpe.<:<)
     } yield {
-      members.filter { _.symbol.typeSignature =:= depTpe } match {
-        case List(valDef) =>
-          depTpe -> selectDep(valDef, dependency, resolution)
+      vals.filter { _.tpe =:= depTpe } match {
+        case List(valInfo) =>
+          depTpe -> selectDep(valInfo, dependency, resolution)
         case Nil =>
           try depTpe -> c.typecheck(q"implicitly[$depTpe]")
           catch {
@@ -131,10 +128,11 @@ class EnvProvider(override val c: blackbox.Context) extends DependencyResolver(c
 
         case multiple =>
           multiple filter {
-            case ValDef(mods, _, _, _) => mods.annotations.exists(ann => c.typecheck(ann, c.TYPEmode).tpe =:= WiredAnnotation)
+            case ValInfo(_, ValDef(mods, _, _, _), _) =>
+              mods.annotations.exists(ann => c.typecheck(ann, c.TYPEmode).tpe =:= WiredAnnotation)
           } match {
-            case List(valDef) => depTpe -> selectDep(valDef, dependency, resolution)
-            case _            => fail(s"""
+            case List(valInfo) => depTpe -> selectDep(valInfo, dependency, resolution)
+            case _             => fail(s"""
                  |Found multiple values of type $depTpe:
                  |${multiple.mkString("\n\tand ")}.
                  |You may choose one of them by just annotating it with @wired annotation
@@ -150,24 +148,23 @@ class EnvProvider(override val c: blackbox.Context) extends DependencyResolver(c
     depsWithImpls.map(_._2)
   }
 
-  private def selectDep(valDef: ValDef, dependency: Dependency, resolution: ConflictResolution): Tree = {
+  private def selectDep(valInfo: ValInfo, dependency: Dependency, resolution: ConflictResolution): Tree = {
     import dependency.{prefixType, name => depName, tpe => depTpe, constructorInfo}
-    import valDef.name
+    import valInfo.valDef
 
     def baseMessage: String = {
       val recommendedName =
         if (!(depName.toString.toLowerCase endsWith "impl")) s"${depName}Impl"
         else s"${depName}0"
 
-      val fileLink = s"${valDef.pos.source.file}:${valDef.pos.line}:${valDef.pos.column}"
       s"""
            |Dependency `$depName` of type $depTpe (in type $prefixType) has the same name
-           |as value `$name` (member of $enclosingCls, $fileLink).
+           |as value $valInfo.
            |For cake-pattern it may cause StackOverflowError due to cyclic reference.
            |It's better to rename `$depName` to (for instance) `$recommendedName`""".stripMargin
     }
 
-    if (depName == name && constructorInfo.isEmpty) resolution match {
+    if (depName == valDef.name && constructorInfo.isEmpty) resolution match {
       case ConflictResolution.Raise =>
         fail(
           s"""
@@ -182,27 +179,18 @@ class EnvProvider(override val c: blackbox.Context) extends DependencyResolver(c
                |If you are not sure what you're doing, use `.raiseOnConflicts` on your EnvInjector  
                |""".stripMargin
         )
-        q"$name"
+        q"${valDef.name}"
     }
-    else q"$name"
+    else q"${valDef.name}"
   }
 
-  private val (enclosingCls, enclosingClassBody) = {
-    val (cls, body) = c.enclosingClass match {
-      case ClassDef(_, name, _, Template(parents, _, body)) => name.toTermName -> (parents ++ body)
-      case ModuleDef(_, name, Template(parents, _, body))   => name            -> (parents ++ body)
-      case e =>
-        fail(s"Unknown type of enclosing class: ${e.getClass}")
-    }
+  private val vals: List[ValInfo] = c.enclosingPackage match {
+    case PackageDef(pkg, stats) =>
+      stats
+        .flatMap(traverseTree(_, history = List(s"package ${pkg.name}")))
+        .distinct
 
-    cls -> (body ++ {
-      val DefDef(_, _, _, _, _, body) = c.enclosingDef
-      body
-        .collect {
-          case valDef: ValDef => valDef
-        }
-        .takeWhile(_.pos.line <= c.enclosingPosition.line)
-    }).distinct
+    case e => fail(s"Unknown type of enclosing package: $e")
   }
 
   private val any             = typeOf[Any].dealias
@@ -222,4 +210,51 @@ class EnvProvider(override val c: blackbox.Context) extends DependencyResolver(c
     } else {
       fail(s"Internal error: unknown Nat case of $N, expected either Zero or Inc")
     }
+
+  case class ValInfo(name: String, valDef: ValDef, history: List[String]) {
+    def tpe: Type = c.typecheck(valDef.tpt, c.TYPEmode).tpe
+
+    override def toString: String = {
+      val fileLink = s"${valDef.pos.source.file}:${valDef.pos.line}:${valDef.pos.column}"
+      s"""
+         |{{{
+         |  val $name: $tpe = ${valDef.rhs}
+         |  in ${history.mkString(" --> ")}
+         |  $fileLink
+         |}}}""".stripMargin
+    }
+  }
+
+  private def traverseTree(tree: Tree, acc: List[ValInfo] = Nil, history: List[String] = Nil): List[ValInfo] = tree match {
+    case valDef @ ValDef(mods, name, _, _) if (valDef.pos.line <= c.enclosingPosition.line) && !mods.hasFlag(Flag.SYNTHETIC) =>
+      ValInfo(name.toString, valDef, history) :: acc
+    case ModuleDef(_, name, Template(parents, _, body)) =>
+      (parents ::: body).flatMap(traverseTree(_, history = history ::: List(s"object $name"))) :::
+        acc
+
+    case ClassDef(_, name, _, Template(parents, _, body)) =>
+      (parents ::: body).flatMap(traverseTree(_, history = history ::: List(s"class $name"))) :::
+        acc
+    case DefDef(_, name, _, _, _, body) => body.collect { case t => t }.flatMap(traverseTree(_, history = history ::: List(s"def $name")))
+    case Apply(fun, body)               => body.flatMap(traverseTree(_, history = history ::: List(s"apply $fun"))) ::: acc
+    case Block(stats, _)                => stats.flatMap(traverseTree(_, history = history)) ::: acc
+    case other                          =>
+//      println(s"Unknown case of type ${other.getClass}: $other")
+      acc
+  }
+
+  implicit class triedEnclosure[A](self: => A) {
+    def tried: String =
+      try self.toString
+      catch {
+        case _: Throwable => "<empty>"
+      }
+  }
+
+  implicit class loggedOps[A](self: A) {
+    def loggedAs(desc: String): A = {
+      println(s"[$desc] $self")
+      self
+    }
+  }
 }

@@ -9,7 +9,7 @@ package object cakeless {
     /**
       * @return = a builder to inject [[R]]
       * */
-    def injectPrimary(implicit ev: ZEnvLike[Z]): EnvInjector0[Z, R, E, A, _0, ConflictResolution.Raise] = new EnvInjector0(self)
+    def inject0(implicit ev: ZEnvLike[Z]): EnvInjector0[Z, R, E, A, _0, ConflictResolution.Raise] = new EnvInjector0(self)
 
     /**
       * @return = a builder to inject [[R]] using constructor [[N]]
@@ -22,7 +22,7 @@ package object cakeless {
     /**
       * @return = a builder to inject [[R]]
       * */
-    def injectPrimary: EnvInjector0[ZIO, R, Nothing, A, _0, ConflictResolution.Raise] = new EnvInjector0(self)
+    def inject0: EnvInjector0[ZIO, R, Nothing, A, _0, ConflictResolution.Raise] = new EnvInjector0(self)
 
     /**
       * @return = a builder to inject [[R]] using constructor [[N]]
@@ -35,7 +35,7 @@ package object cakeless {
     /**
       * @return = a builder to inject [[R]]
       * */
-    def injectPrimary: EnvInjector0[ZManaged, R, Nothing, A, _0, ConflictResolution.Raise] = new EnvInjector0(self)
+    def inject0: EnvInjector0[ZManaged, R, Nothing, A, _0, ConflictResolution.Raise] = new EnvInjector0(self)
 
     /**
       * @return = a builder to inject [[R]] using constructor [[N]]

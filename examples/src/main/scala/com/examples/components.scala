@@ -11,6 +11,10 @@ trait ExecutionContextComponent {
   implicit def ec: ExecutionContext
 }
 
+trait ExecutionContextComponentImpl extends ExecutionContextComponent {
+  override implicit val ec: ExecutionContext = ExecutionContext.global
+}
+
 trait FileConfigComponent {
   def configPath: ConfigPath
 }

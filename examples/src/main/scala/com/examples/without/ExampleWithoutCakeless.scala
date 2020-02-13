@@ -1,21 +1,13 @@
-package com.examples
+package com.examples.without
 
 import java.nio.file.Paths
-import cakeless._
-import cakeless.nat._
-import zio.console._
+import com.examples.types.{ConfigPath, Password, Props, Username}
+import com.examples._
 import zio._
+import zio.console._
 import scala.concurrent.ExecutionContext
-import ExecutionContext.Implicits.global
-import types._
 
-object Example extends App {
-  val propsProd: Props        = Props(Map("host" -> "4.4.4.4"))
-  @wired val propsTest: Props = Props(Map("host" -> "localhost")) // todo: you may annotate propsProd instead any see what happens :)
-
-  val configPathProd: ConfigPath = ConfigPath(Paths.get("./examples/src/main/resources/application.conf"))
-  implicit val token: Token      = Token("safjginkl352")
-
+object ExampleWithoutCakeless extends App {
   def run(args: List[String]): ZIO[ZEnv, Nothing, Int] = {
 
     val configValue =
@@ -41,12 +33,24 @@ object Example extends App {
       host   <- hostValue
     } yield s"$host:$port?token=${c2.token}"
 
-//     todo: uncomment these 3 lines and comment `injectPrimary` to see how specific constructor selection works like
-    val username: Username                          = Username("vitaliihonta")
-    val password: Password                          = Password("password")
-    val wired: IO[IllegalArgumentException, String] = url.inject[_1].wire
+    val username: Username         = Username("vitaliihonta")
+    val password: Password         = Password("password")
+    val propsProd: Props           = Props(Map("host" -> "4.4.4.4"))
+    val configPathProd: ConfigPath = ConfigPath(Paths.get("./examples/src/main/resources/application.conf"))
 
-//    val wired: IO[IllegalArgumentException, String] = url.injectPrimary.wire
+    val wired: IO[IllegalArgumentException, String] = url.provide {
+      new NestedComponent(username, password)
+        with AllComponents2
+        with AllComponents1
+        with ExecutionContextComponent
+        with PropsComponent
+        with FileConfigComponent {
+
+        override implicit val ec: ExecutionContext = ExecutionContext.global
+        override val props: Props                  = propsProd
+        override val configPath: ConfigPath        = configPathProd
+      }
+    }
     wired
       .catchAll(e => ZIO.succeed(e.getMessage))
       .flatMap(putStrLn) *> ZIO.succeed(0)
