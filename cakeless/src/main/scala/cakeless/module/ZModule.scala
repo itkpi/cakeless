@@ -16,10 +16,10 @@ sealed trait ZModule[-R, +E, +A] {
 }
 
 trait ZModuleDecl[-Rx, +Ex, +Ax] extends ZModule[Rx, Ex, Ax] {
-  final type R     = Rx @uncheckedVariance
-  final type E     = Ex @uncheckedVariance
-  final type Wired = Ax @uncheckedVariance
-  final type Decl  = this.type
+  type R >: Rx
+  type E <: Ex
+  type Wired <: Ax
+  final type Decl = this.type
 
   override def flatMap[R1 <: Rx, E1 >: Ex, B](f: Ax => ZModule[R1, E1, B]): ZModule[R1, E1, B] =
     ZModule.FlatMapFn(this, f)
@@ -33,8 +33,8 @@ trait RModuleDecl[-Rx, +Ax]  extends ZModuleDecl[Rx, Throwable, Ax]
 trait UModuleDecl[+Ax]       extends ZModuleDecl[Any, Nothing, Ax]
 trait URModuleDecl[-Rx, +Ax] extends ZModuleDecl[Rx, Nothing, Ax]
 
-class ModuleDefn[R, E, A](builder: ModuleBuilder[R, E, A]) extends ZModuleDecl[R, E, A] {
-  final override def environment: ZManaged[R, E, A] = builder.`env`
+class ModuleDefn[-Rx, +Ex, +Ax](builder: ModuleBuilder[Rx, Ex, Ax]) extends ZModuleDecl[Rx, Ex, Ax] {
+  final override def environment: ZManaged[Rx, Ex, Ax] = builder.`env`
 }
 
 object Limits extends ModuleDecl[Throwable, Int]

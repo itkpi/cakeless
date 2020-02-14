@@ -33,8 +33,11 @@ abstract class DependencyResolver(val c: blackbox.Context) extends MacroUtils {
   protected def assertMacro(cond: Boolean, msg: String): Unit =
     if (!cond) c.abort(c.enclosingPosition, msg)
 
-  protected def ifDebug[U](thunk: => U): Unit =
-    if (debug) thunk
+  protected def debugged[U](force: Boolean = debug, extraInfo: String = "")(thunk: => U): U = {
+    val res = thunk
+    if (force) println(s"[Cakeless] [Macro] $extraInfo $res")
+    res
+  }
 
   protected def extractClassesChain(tpe: Type): List[Type] = tpe match {
     case RefinedType(types, _) => types.flatMap(extractClassesChain)
@@ -79,9 +82,8 @@ abstract class DependencyResolver(val c: blackbox.Context) extends MacroUtils {
       } yield Dependency(prefixType = prefixType, name = av.name, tpe = av.returnType, constructorInfo = None)
     }
 
-    ifDebug {
-      println(s"Main type: $mainType")
-      println(sep)
+    debugged() {
+      s"Main type: $mainType\n$sep"
     }
 
     val constructorParams = {
@@ -108,9 +110,8 @@ abstract class DependencyResolver(val c: blackbox.Context) extends MacroUtils {
       }
     }
 
-    ifDebug {
-      println(s"#$constructor constructor params: $constructorParams")
-      println(sep)
+    debugged() {
+      s"#$constructor constructor params: $constructorParams\n$sep"
     }
 
     val allParamsList = constructorParams.flatMap(
@@ -126,9 +127,8 @@ abstract class DependencyResolver(val c: blackbox.Context) extends MacroUtils {
 
     val typeRefinements = refinements.flatMap(extractClassesChain).filterNot(_ <:< mainType).distinct
 
-    ifDebug {
-      println("Self-types:\n\t" + typeRefinements.mkString("\n\t"))
-      println(sep)
+    debugged() {
+      "Self-types:\n\t" + typeRefinements.mkString("\n\t") + '\n' + sep
     }
 
     val depsValueName = TermName("deps")
@@ -140,11 +140,8 @@ abstract class DependencyResolver(val c: blackbox.Context) extends MacroUtils {
           (paramsAcc :+ carryIndexes, offset + carry.size)
       }
 
-    ifDebug {
-      println(
-        "Constructor params:\n\t" + passConstructorParams.mkString("\n\t")
-      )
-      println(sep)
+    debugged() {
+      "Constructor params:\n\t" + passConstructorParams.mkString("\n\t") + '\n' + sep
     }
 
     val assignmentIndexes = {
@@ -154,9 +151,8 @@ abstract class DependencyResolver(val c: blackbox.Context) extends MacroUtils {
       }
     }
 
-    ifDebug {
-      println("Assignments:\n\t" + assignmentIndexes.mkString("\n\t"))
-      println(sep)
+    debugged() {
+      "Assignments:\n\t" + assignmentIndexes.mkString("\n\t") + '\n' + sep
     }
 
     CakeInfo(
