@@ -51,6 +51,11 @@ object BuildConfig {
       )
     }
 
+    def withMacro(): Project =
+      self.settings(
+        libraryDependencies += "org.scala-lang" % "scala-reflect" % scalaVersion.value
+      )
+
     def withCommonSettings(): Project = {
       val option = onScalaVersion(
         `on-2-12` = List("-Ypartial-unification"),

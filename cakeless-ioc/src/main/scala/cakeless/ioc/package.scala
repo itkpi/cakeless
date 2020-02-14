@@ -1,6 +1,6 @@
 package cakeless
 
-package object module {
+package object ioc {
   type Module[+E, +A]   = ZModule[Any, E, A]
   type UModule[+A]      = Module[Nothing, A]
   type URModule[-R, +A] = ZModule[R, Nothing, A]

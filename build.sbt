@@ -1,9 +1,5 @@
 import BuildConfig._
 
-lazy val scalaReflect = Def.setting {
-  "org.scala-lang" % "scala-reflect" % scalaVersion.value
-}
-
 organization in ThisBuild := "ua.pp.itkpi"
 
 val `scala-2-12` = "2.12.10"
@@ -18,20 +14,42 @@ def sonatypeProject(id: String, base: File) =
       name := id,
       resolvers += Resolver.sonatypeRepo("releases"),
       libraryDependencies ++= Seq(
-        Macros.resetallattrs
-      )
+        )
     )
+    .withMacro()
     .withMacroAnnotations()
     .withCommonSettings()
 
-lazy val cakeless = sonatypeProject(id = "cakeless", base = file("./cakeless"))
+lazy val `cakeless-injector` = sonatypeProject(id = "cakekess-injector", base = file("./cakeless-injector"))
+  .settings(
+    libraryDependencies ++= Seq(
+      )
+  )
+
+lazy val `cakeless-compiletime` = sonatypeProject(id = "cakeless-compiletime", base = file("./cakeless-compiletime"))
+  .dependsOn(`cakeless-injector`)
+  .settings(
+    libraryDependencies ++= Seq(
+      Macros.utils,
+      Macros.resetallattrs
+    )
+  )
+
+lazy val `cakeless-ioc` = sonatypeProject(id = "cakeless-ioc", base = file("./cakeless-ioc"))
   .settings(
     libraryDependencies ++= {
       Seq(
-        Macros.utils,
         Zio.zio
       )
     }
+  )
+  .withZioTest()
+
+lazy val cakeless = sonatypeProject(id = "cakeless", base = file("./cakeless"))
+  .dependsOn(
+    `cakeless-injector`,
+    `cakeless-compiletime`,
+    `cakeless-ioc`
   )
   .withZioTest()
 
@@ -68,7 +86,7 @@ lazy val docs = project
 
 lazy val root = project
   .in(file("."))
-  .aggregate(cakeless, examples, docs)
+  .aggregate(cakeless, `cakeless-injector`, `cakeless-compiletime`, `cakeless-ioc`, examples, docs)
   .settings(
     name := "cakeless-new-root",
     skip in publish := true,

@@ -1,4 +1,4 @@
-package cakeless.internal
+package cakeless.compiletime
 
 import japgolly.microlibs.macro_utils.MacroUtils
 import scala.language.experimental.macros

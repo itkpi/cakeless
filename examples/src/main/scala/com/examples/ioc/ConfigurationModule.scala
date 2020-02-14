@@ -3,7 +3,8 @@ package com.examples.ioc
 import java.nio.file.Paths
 
 import cakeless._
-import cakeless.module._
+import cakeless.ioc._
+import cakeless.compiletime._
 import com.examples.types.{ConfigPath, Props}
 import com.examples.{FileConfigComponent, PropsComponent}
 import zio._

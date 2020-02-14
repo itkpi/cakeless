@@ -1,7 +1,6 @@
-package cakeless.module
+package cakeless.ioc
 
 import zio.{ZIO, ZManaged}
-
 import scala.annotation.unchecked.uncheckedVariance
 
 class ModuleBuilder0[-R, +E, +A] private[cakeless] (val `decl`: ZModule[R, E, A]) extends AnyVal {

@@ -1,9 +1,9 @@
 package cakeless
 
-import cakeless.internal.{EnvConstructor, ZEnvLike}
+import cakeless.inject.EnvConstructor
+import cakeless.ioc.{Lifecycle, ZEnvLike}
 import cakeless.nat.Nat
 import zio._
-
 import scala.language.implicitConversions
 
 class EnvInjector0[Z[-_, +_, +_]: ZEnvLike, R, E, A, N <: Nat, CR <: ConflictResolution](private val z: Z[R, E, A]) {
@@ -38,7 +38,7 @@ class EnvInjector0[Z[-_, +_, +_]: ZEnvLike, R, E, A, N <: Nat, CR <: ConflictRes
     * */
   def wire(implicit constructor: EnvConstructor.Aux[R, N, CR, Any]): Z[Any, E, A] =
     Z.provideSomeM(z)(
-      ZIO.environment[Any].flatMap(constructor.construct)
+      ZIO.environment[Any].map(constructor.construct)
     )
 }
 
@@ -73,7 +73,7 @@ class EnvInjector1[Z[-_, +_, +_]: ZEnvLike, R, T, E, A, R1, R2, N <: Nat, CR <: 
   ): Z[T, E, A] = {
     val construct: URIO[R2 with T with R1, R2 with R with R1] = for {
       _   <- lifecycle.preStartURIO
-      all <- ZIO.accessM[T](constructor.construct)
+      all <- ZIO.access[T](constructor.construct)
       _   <- lifecycle.postStartURIO(all)
     } yield all
 

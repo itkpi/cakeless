@@ -1,8 +1,12 @@
 package cakeless
 
 import java.util.concurrent.atomic.AtomicBoolean
+
+import cakeless.ZioLifecycleFixture.sampleConsole
 import zio._
 import zio.console._
+import cakeless.ioc._
+import cakeless.compiletime._
 import zio.test.Assertion._
 import zio.test._
 
@@ -106,12 +110,18 @@ object ZManagedLifecycleSpec
 
           (for {
             postUsedValue <- ZManaged.fromEffect(Ref.make(0))
-            _ <- (ZManaged.environment[SampleComp2] *> ZManaged.fromEffect(putStrLn("CREATED"))).unit.inject0
-              .withLifecycle {
-                Lifecycle.postStart((sw: SampleComp2) => postUsedValue.set(sw.x.foo))
-              }
-              .excludeZEnv[Console]
-              .wire
+            _ <- {
+//              val cnsl: Console.Service[Any] = sampleConsole
+              (ZManaged
+                .environment[SampleComp2] /* *> ZManaged.fromEffect(putStrLn("CREATED"))*/ )
+                .unit
+                .inject0
+                .withLifecycle {
+                  Lifecycle.postStart((sw: SampleComp2) => postUsedValue.set(sw.x.foo))
+                }
+                //                .excludeZEnv[Console]
+                .wire
+            }
             resultedPostUsedValue <- ZManaged.fromEffect(postUsedValue.get)
           } yield {
             assert(flag.get(), equalTo(true)) &&

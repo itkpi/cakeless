@@ -1,38 +1,34 @@
-package cakeless.internal
+package cakeless.compiletime
 
 import cakeless.{wired, ConflictResolution}
 import scala.reflect.macros.{blackbox, TypecheckException}
-import zio.blocking.Blocking
-import zio.clock.Clock
-import zio.console.Console
-import zio.random.Random
 import cakeless.nat._
 
-class EnvProvider(override val c: blackbox.Context) extends DependencyResolver(c) {
+class CompileTimeInjector(override val c: blackbox.Context) extends DependencyResolver(c) {
 
   import c.universe._
 
   def mkConstructorImpl[R: WeakTypeTag, T >: R: WeakTypeTag, N <: Nat: WeakTypeTag, CR <: ConflictResolution: WeakTypeTag]: Tree = {
-    val R              = weakTypeOf[R].dealias
-    val N              = weakTypeOf[N].dealias
-    val T              = weakTypeOf[T].dealias
-    val CR             = weakTypeOf[CR].dealias
-    val unrefinedT     = unrefine(T).toSet.filterNot(_ =:= any)
-    val depsExclusions = zenvMembers.collect { case (k, _) if unrefinedT.contains(k) => k }.toList
+    val R          = weakTypeOf[R].dealias
+    val N          = weakTypeOf[N].dealias
+    val T          = weakTypeOf[T].dealias
+    val CR         = weakTypeOf[CR].dealias
+    val unrefinedT = unrefine(T).toSet.filterNot(_ =:= any)
+//    val depsExclusions = zenvMembers.collect { case (k, _) if unrefinedT.contains(k) => k }.toList
     val resolution = CR match {
       case AutoResolution  => ConflictResolution.Auto
       case RaiseResolution => ConflictResolution.Raise
       case WarnResolution  => ConflictResolution.Warn
     }
 
-    unrefinedT.collectFirst {
-      case tpe if !zenv.contains(tpe) =>
-        fail(s"Attempt to exclude ($tpe) which is not a part of zio.ZEnv! Please, do it manually")
-    }
+//    unrefinedT.collectFirst {
+//      case tpe if !zenv.contains(tpe) =>
+//        fail(s"Attempt to exclude ($tpe) which is not a part of zio.ZEnv! Please, do it manually")
+//    }
 
-    val info = getCakeInfo[R](constructor(N), refinementExclusions = unrefinedT, depsExclusions = depsExclusions.toSet)
+    val info = getCakeInfo[R](constructor(N), refinementExclusions = unrefinedT, depsExclusions = Set.empty)
     import info._
-    val (dependenciesList, foundVals) = collectDependencies(depsTypesList, depsExclusions, resolution)
+    val (dependenciesList, foundVals) = collectDependencies(depsTypesList, List.empty, resolution)
     debugged() {
       s"Excluded types: $excludedTypes\nexcluded deps: $excludedDeps\n$sep"
     }
@@ -45,14 +41,14 @@ class EnvProvider(override val c: blackbox.Context) extends DependencyResolver(c
       val overrides = assignmentWithIndexes.map {
         case (name, idx) => c.untypecheck(q"""override lazy val $name = ${dependenciesList(idx)}""")
       }
-      val exclusions = excludedDeps.map { method =>
+      /*val exclusions = excludedDeps.map { method =>
         val itsTpe = method.returnType.dealias
         val (_, selectionCode) = zenvMembers.find { case (zenvTpe, _) => itsTpe <:< zenvTpe }.getOrElse {
           fail(s"Not found ZEnv method for method $method with return type $itsTpe")
         }
         c.untypecheck(q"override lazy val ${method.name}: $itsTpe = $standardDepName.$selectionCode")
-      }
-      overrides ++ exclusions
+      }*/
+      overrides // ++ exclusions
     }
     val refinementsWithExclusions = typeRefinements ++ resultingExclusions
     val envCode =
@@ -67,38 +63,38 @@ class EnvProvider(override val c: blackbox.Context) extends DependencyResolver(c
     val createExcluder = excludedTypes match {
       case Nil =>
         q"""
-          new _root_.cakeless.internal.EnvConstructor[$R, $N, $CR] {
+          new _root_.cakeless.inject.EnvConstructor[$R, $N, $CR] {
             type Excluded = $any
-            override def construct(r: Excluded): UIO[$R] = UIO.effectTotal($envCode)
+            override def construct(r: Excluded): $R = $envCode
           }
          """
       case _ =>
         q"""
-           new _root_.cakeless.internal.EnvConstructor[$R, $N, $CR] {
+           new _root_.cakeless.inject.EnvConstructor[$R, $N, $CR] {
             type Excluded = $T
-            override def construct($standardDepName: Excluded): UIO[$R] = UIO.effectTotal($envCode)
+            override def construct($standardDepName: Excluded): $R = $envCode
           }
          """
     }
 
     debugged(force = false) {
-      val exprs = zioImport :: autoAssignments ::: List(createExcluder)
+      val exprs = autoAssignments ::: List(createExcluder)
       q"""..$exprs"""
     }
   }
-
-  private val zenv: Set[Type] = {
-    Set(typeOf[Clock], typeOf[Console], typeOf[zio.system.System], typeOf[Random], typeOf[Blocking])
-      .map(_.dealias)
-  }
-
-  private val zenvMembers = Set(
-    typeOf[Clock.Service[_]]             -> TermName("clock"),
-    typeOf[Console.Service[_]]           -> TermName("console"),
-    typeOf[zio.system.System.Service[_]] -> TermName("system"),
-    typeOf[Random.Service[_]]            -> TermName("random"),
-    typeOf[Blocking.Service[_]]          -> TermName("blocking")
-  ).map { case (k, v) => k.dealias -> v }.toMap
+//
+//  private val zenv: Set[Type] = {
+//    Set(typeOf[Clock], typeOf[Console], typeOf[zio.system.System], typeOf[Random], typeOf[Blocking])
+//      .map(_.dealias)
+//  }
+//
+//  private val zenvMembers = Set(
+//    typeOf[Clock.Service[_]]             -> TermName("clock"),
+//    typeOf[Console.Service[_]]           -> TermName("console"),
+//    typeOf[zio.system.System.Service[_]] -> TermName("system"),
+//    typeOf[Random.Service[_]]            -> TermName("random"),
+//    typeOf[Blocking.Service[_]]          -> TermName("blocking")
+//  ).map { case (k, v) => k.dealias -> v }.toMap
 
   private def collectDependencies(
       dependencies: List[Dependency],
@@ -155,7 +151,7 @@ class EnvProvider(override val c: blackbox.Context) extends DependencyResolver(c
   }
 
   private def selectDep(valInfo: ValInfo, dependency: Dependency, resolution: ConflictResolution): Tree = {
-    import dependency.{prefixType, name => depName, tpe => depTpe, constructorInfo}
+    import dependency.{constructorInfo, prefixType, name => depName, tpe => depTpe}
     import valInfo.valDef
 
     def baseMessage: String = {
@@ -211,7 +207,6 @@ class EnvProvider(override val c: blackbox.Context) extends DependencyResolver(c
   private val RaiseResolution = typeOf[ConflictResolution.Raise].dealias
   private val WarnResolution  = typeOf[ConflictResolution.Warn].dealias
   private val WiredAnnotation = typeOf[wired].dealias
-  private val zioImport       = q"import _root_.zio._"
 
   private def constructor(N: Type): Int =
     if (N =:= Zero) 0
@@ -270,10 +265,9 @@ class EnvProvider(override val c: blackbox.Context) extends DependencyResolver(c
     override def toString: String = toStringImpl(tpeStr = Some(tpe.toString))
   }
 
-  private def isAccessibleFrom(tree: Tree)(from: Tree): Boolean = {
-    c.echo(c.enclosingPosition, s"Checking accessibility of $tree from $from")
+  private def isAccessibleFrom(tree: Tree)(from: Tree): Boolean =
+//    c.echo(c.enclosingPosition, s"Checking accessibility of $tree from $from")
     true
-  }
 
   object ValInfoTraverser extends Traverser {
     private var _infos: List[ValInfo]  = Nil
@@ -350,7 +344,10 @@ class EnvProvider(override val c: blackbox.Context) extends DependencyResolver(c
 
       case Import(s, sels) =>
         val checkedImport = c.typecheck(s, mode = c.TYPEmode, silent = true)
-        val isWildCard    = sels.exists(_.isWildcard)
+        val isWildCard = sels.exists {
+          case ImportSelector(TermName("_"), _, null, _) => true
+          case _                                         => false
+        }
         if (!isWildCard) Nil
         else {
           debugged(force = false) {

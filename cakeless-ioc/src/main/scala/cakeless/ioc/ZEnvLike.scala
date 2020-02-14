@@ -1,4 +1,4 @@
-package cakeless.internal
+package cakeless.ioc
 
 import zio.{NeedsEnv, ZIO, ZManaged}
 import scala.annotation.implicitNotFound

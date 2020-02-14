@@ -1,11 +1,11 @@
 package com.examples.ioc
 
 import cakeless._
-import cakeless.module._
+import cakeless.ioc._
+import cakeless.compiletime._
 import com.examples.types.{Props, Token}
 import com.examples.{AllComponents2, DbComponent, ExecutionContextComponent, NestedComponent, PropsComponent}
 import zio._
-
 import scala.concurrent.ExecutionContext
 
 object ServiceModule extends UModuleDecl[NestedComponent with DbComponent]

@@ -1,4 +1,4 @@
-package cakeless
+package cakeless.ioc
 
 import zio._
 

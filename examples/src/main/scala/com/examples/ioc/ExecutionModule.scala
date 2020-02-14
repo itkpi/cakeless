@@ -1,6 +1,6 @@
 package com.examples.ioc
 
-import cakeless.module._
+import cakeless.ioc._
 import com.examples.{ExecutionContextComponent, ExecutionContextComponentImpl}
 import zio.ZIO
 

@@ -1,6 +1,7 @@
-import cakeless.internal.ZEnvLike
+import cakeless.ioc.ZEnvLike
 import zio._
 import cakeless.nat._
+
 import scala.language.experimental.macros
 
 package object cakeless {

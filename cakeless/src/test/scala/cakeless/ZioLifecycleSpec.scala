@@ -5,13 +5,16 @@ import zio._
 import zio.console._
 import zio.test.Assertion._
 import zio.test._
+import cakeless.ioc._
+import cakeless.compiletime._
 
 object ZioLifecycleFixture {
   val sampleZio: ZIO[SampleComponent, Nothing, Int] = ZIO.environment[SampleComponent].as(1)
   val sampleDep: SampleDep                          = SampleDep(1)
+  val sampleConsole: Console.Service[Any]           = new Console.Live {}.console
 }
 
-import cakeless.ZioLifecycleFixture._
+import ZioLifecycleFixture._
 object ZioLifecycleSpec
     extends DefaultRunnableSpec(
       suite("ZioLifecycleSpec")(
@@ -99,13 +102,18 @@ object ZioLifecycleSpec
             flag.set(true)
           }
 
+//          val cnsl: Console.Service[Any] = sampleConsole
+
           for {
             postUsedValue <- Ref.make(0)
-            _ <- (ZIO.environment[SampleComp2] *> putStrLn("CREATED")).unit.inject0
+            _ <- (ZIO
+              .environment[SampleComp2] /**> putStrLn("CREATED")*/ )
+              .unit
+              .inject0
               .withLifecycle {
                 Lifecycle.postStart((sw: SampleComp2) => postUsedValue.set(sw.x.foo))
               }
-              .excludeZEnv[Console]
+              //              .excludeZEnv[Console]
               .wire
             resultedPostUsedValue <- postUsedValue.get
           } yield {

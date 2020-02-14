@@ -1,9 +1,6 @@
-package cakeless.module
+package cakeless.ioc
 
-import cakeless.internal.ZEnvLike
-import zio.{Managed, NeedsEnv, ZIO, ZManaged}
-
-import scala.annotation.unchecked.uncheckedVariance
+import zio.{NeedsEnv, ZIO, ZManaged}
 
 sealed trait ZModule[-R, +E, +A] {
   def flatMap[R1 <: R, E1 >: E, B](f: A => ZModule[R1, E1, B]): ZModule[R1, E1, B]
@@ -35,20 +32,6 @@ trait URModuleDecl[-Rx, +Ax] extends ZModuleDecl[Rx, Nothing, Ax]
 
 class ModuleDefn[-Rx, +Ex, +Ax](builder: ModuleBuilder[Rx, Ex, Ax]) extends ZModuleDecl[Rx, Ex, Ax] {
   final override def environment: ZManaged[Rx, Ex, Ax] = builder.`env`
-}
-
-object Limits extends ModuleDecl[Throwable, Int]
-object LimitsImpl
-    extends ModuleDefn(
-      of(Limits).apply {
-        ZManaged.fromEffect {
-          ZIO(1)
-        }
-      }
-    )
-
-object Foo {
-  val x: Module[Throwable, Int] = LimitsImpl
 }
 
 object ZModule {
