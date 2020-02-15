@@ -17,6 +17,6 @@ object ConfigurationModuleImpl
         val configPathImpl: ConfigPath = ConfigPath(Paths.get("./examples/src/main/resources/application.conf"))
         val propsImpl: Props           = Props(Map("host" -> "localhost"))
 
-        ZIO.environment[FileConfigComponent with PropsComponent].inject0.wire
+        a[FileConfigComponent with PropsComponent].inject0.wire
       }
     )

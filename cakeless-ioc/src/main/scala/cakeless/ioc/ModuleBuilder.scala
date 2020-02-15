@@ -30,6 +30,9 @@ class ModuleBuilder0[-R, +E, +A] private[cakeless] (val `decl`: ZModule[R, E, A]
 
   def apply[R0 <: R, E1 >: E, A1 >: A](effect: ZIO[R0, E1, A1]): ModuleBuilder[R0, E1, A1] =
     apply(ZManaged.fromEffect(effect))
+
+  def apply[A1 >: A](value: A1): ModuleBuilder[R, E, A1] =
+    apply(ZManaged.succeed(value))
 }
 
 class ModuleBuilder1[-R0, -R, +E, +A] private[cakeless] (

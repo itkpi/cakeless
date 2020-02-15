@@ -9,7 +9,7 @@ sealed trait ZModule[-R, +E, +A] {
 
   def map[B](f: A => B): ZModule[R, E, B] = ZModule.MapFn(this, f)
 
-  def environment: ZManaged[R, E, A] = ZModule.toZManaged(this)
+  def asManaged: ZManaged[R, E, A] = ZModule.toZManaged(this)
 }
 
 trait ZModuleDecl[-Rx, +Ex, +Ax] extends ZModule[Rx, Ex, Ax] {
@@ -22,7 +22,7 @@ trait ZModuleDecl[-Rx, +Ex, +Ax] extends ZModule[Rx, Ex, Ax] {
     ZModule.FlatMapFn(this, f)
 
   override def provideSomeM[R0, E1 >: Ex](r0: ZIO[R0, E1, Rx])(implicit ev: NeedsEnv[Rx]): ZModule[R0, E1, Ax] =
-    new ZModule.Managed(ZManaged.fromEffect(r0).flatMap(environment.provide))
+    new ZModule.Managed(ZManaged.fromEffect(r0).flatMap(asManaged.provide))
 }
 
 trait ModuleDecl[+Ex, +Ax]   extends ZModuleDecl[Any, Ex, Ax]
@@ -31,7 +31,7 @@ trait UModuleDecl[+Ax]       extends ZModuleDecl[Any, Nothing, Ax]
 trait URModuleDecl[-Rx, +Ax] extends ZModuleDecl[Rx, Nothing, Ax]
 
 class ModuleDefn[-Rx, +Ex, +Ax](builder: ModuleBuilder[Rx, Ex, Ax]) extends ZModuleDecl[Rx, Ex, Ax] {
-  final override def environment: ZManaged[Rx, Ex, Ax] = builder.`env`
+  final override def asManaged: ZManaged[Rx, Ex, Ax] = builder.`env`
 }
 
 object ZModule {
@@ -44,7 +44,7 @@ object ZModule {
   def fromManaged[R, E, A](managed: ZManaged[R, E, A]): ZModule[R, E, A] = new ZModule.Managed(managed)
 
   private[cakeless] def toZManaged[R, E, A](module: ZModule[R, E, A]): ZManaged[R, E, A] = module match {
-    case decl: ZModuleDecl[R, E, A]        => decl.environment
+    case decl: ZModuleDecl[R, E, A]        => decl.asManaged
     case ZModule.Succeed(value)            => ZManaged.succeed(value)
     case ZModule.Fail(e)                   => ZManaged.fail(e)
     case ZModule.Effect(zio)               => ZManaged.fromEffect(zio)
@@ -61,7 +61,7 @@ object ZModule {
         .asInstanceOf[ZManaged[R, E, A]]
   }
 
-  implicit val zmoduleLikeZEnv: ZEnvLike[ZModule] = new ZEnvLike[ZModule] {
+  implicit val zmoduleLikeZEnv: Injectable[ZModule] = new Injectable[ZModule] {
     override def provideSomeM[R, E, A, R0, E1 >: E](
         z: ZModule[R, E, A]
     )(r0: ZIO[R0, E1, R])(implicit ev: NeedsEnv[R]): ZModule[R0, E1, A] =

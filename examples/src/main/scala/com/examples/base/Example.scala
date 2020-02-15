@@ -3,6 +3,7 @@ package com.examples.base
 import java.nio.file.Paths
 import cakeless._
 import cakeless.nat._
+import cakeless.ioc._
 import cakeless.compiletime._
 import com.examples.types._
 import com.examples.{AllComponents1, AllComponents2, NestedComponent}

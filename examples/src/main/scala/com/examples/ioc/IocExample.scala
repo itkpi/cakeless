@@ -1,6 +1,11 @@
 package com.examples.ioc
 
-import cakeless._
 import cakeless.ioc._
+import zio.console.putStrLn
 
-object IocExample {}
+object IocExample
+    extends ApplicationDefn(
+      of(Main) {
+        putStrLn("Hello, cakeless!")
+      }
+    )

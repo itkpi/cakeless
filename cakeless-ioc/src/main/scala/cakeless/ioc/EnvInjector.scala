@@ -1,13 +1,13 @@
-package cakeless
+package cakeless.ioc
 
-import cakeless.inject.EnvConstructor
-import cakeless.ioc.{Lifecycle, ZEnvLike}
-import cakeless.nat.Nat
 import zio._
+import cakeless._
+import cakeless.nat._
+import cakeless.kernel.EnvConstructor
 import scala.language.implicitConversions
 
-class EnvInjector0[Z[-_, +_, +_]: ZEnvLike, R, E, A, N <: Nat, CR <: ConflictResolution](private val z: Z[R, E, A]) {
-  private val Z = implicitly[ZEnvLike[Z]]
+class EnvInjector0[Z[-_, +_, +_]: Injectable, R, E, A, N <: Nat, CR <: CollisionResolving](private val z: Z[R, E, A]) {
+  private val Z = implicitly[Injectable[Z]]
 
   /**
     * @param lifecycle - lifecycle for component [[A]]
@@ -24,14 +24,8 @@ class EnvInjector0[Z[-_, +_, +_]: ZEnvLike, R, E, A, N <: Nat, CR <: ConflictRes
   /**
     * @return - a builder which will raise compile-time error on name collisions
     * */
-  def raiseOnConflicts: EnvInjector0[Z, R, E, A, N, ConflictResolution.Raise] =
-    this.asInstanceOf[EnvInjector0[Z, R, E, A, N, ConflictResolution.Raise]]
-
-  /**
-    * @return - a builder which will just warn on name collisions
-    * */
-  def warnConflicts: EnvInjector0[Z, R, E, A, N, ConflictResolution.Warn] =
-    this.asInstanceOf[EnvInjector0[Z, R, E, A, N, ConflictResolution.Warn]]
+  def resolveCollisions[CR0 <: CollisionResolving]: EnvInjector0[Z, R, E, A, N, CR0] =
+    this.asInstanceOf[EnvInjector0[Z, R, E, A, N, CR0]]
 
   /**
     * @return - [[Z]] with automatically wired [[A]]
@@ -42,11 +36,11 @@ class EnvInjector0[Z[-_, +_, +_]: ZEnvLike, R, E, A, N <: Nat, CR <: ConflictRes
     )
 }
 
-class EnvInjector1[Z[-_, +_, +_]: ZEnvLike, R, T, E, A, R1, R2, N <: Nat, CR <: ConflictResolution](
+class EnvInjector1[Z[-_, +_, +_]: Injectable, R, T, E, A, R1, R2, N <: Nat, CR <: CollisionResolving](
     private val z: Z[R, E, A],
     private val lifecycle: Lifecycle[R1, R2, R]
 ) {
-  private val Z = implicitly[ZEnvLike[Z]]
+  private val Z = implicitly[Injectable[Z]]
 
   /**
     * @tparam T0 - more [[_root_.zio.ZEnv]] to be excluded from dependency resolution process
@@ -56,14 +50,8 @@ class EnvInjector1[Z[-_, +_, +_]: ZEnvLike, R, T, E, A, R1, R2, N <: Nat, CR <: 
   /**
     * @return - a builder which will raise compile-time error on name collisions
     * */
-  def raiseOnConflicts: EnvInjector1[Z, R, T, E, A, R1, R2, N, ConflictResolution.Raise] =
-    this.asInstanceOf[EnvInjector1[Z, R, T, E, A, R1, R2, N, ConflictResolution.Raise]]
-
-  /**
-    * @return - a builder which will just warn on name collisions
-    * */
-  def warnConflicts: EnvInjector1[Z, R, T, E, A, R1, R2, N, ConflictResolution.Warn] =
-    this.asInstanceOf[EnvInjector1[Z, R, T, E, A, R1, R2, N, ConflictResolution.Warn]]
+  def resolveCollisions[CR0 <: CollisionResolving]: EnvInjector1[Z, R, T, E, A, R1, R2, N, CR0] =
+    this.asInstanceOf[EnvInjector1[Z, R, T, E, A, R1, R2, N, CR0]]
 
   /**
     * @return - [[Z]] with automatically wired [[A]] (except of ZEnv part [[T]])

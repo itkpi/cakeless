@@ -20,14 +20,14 @@ def sonatypeProject(id: String, base: File) =
     .withMacroAnnotations()
     .withCommonSettings()
 
-lazy val `cakeless-injector` = sonatypeProject(id = "cakekess-injector", base = file("./cakeless-injector"))
+lazy val `cakeless-kernel` = sonatypeProject(id = "cakekess-kernel", base = file("./cakeless-injector"))
   .settings(
     libraryDependencies ++= Seq(
       )
   )
 
 lazy val `cakeless-compiletime` = sonatypeProject(id = "cakeless-compiletime", base = file("./cakeless-compiletime"))
-  .dependsOn(`cakeless-injector`)
+  .dependsOn(`cakeless-kernel`)
   .settings(
     libraryDependencies ++= Seq(
       Macros.utils,
@@ -36,6 +36,7 @@ lazy val `cakeless-compiletime` = sonatypeProject(id = "cakeless-compiletime", b
   )
 
 lazy val `cakeless-ioc` = sonatypeProject(id = "cakeless-ioc", base = file("./cakeless-ioc"))
+  .dependsOn(`cakeless-kernel`)
   .settings(
     libraryDependencies ++= {
       Seq(
@@ -47,7 +48,7 @@ lazy val `cakeless-ioc` = sonatypeProject(id = "cakeless-ioc", base = file("./ca
 
 lazy val cakeless = sonatypeProject(id = "cakeless", base = file("./cakeless"))
   .dependsOn(
-    `cakeless-injector`,
+    `cakeless-kernel`,
     `cakeless-compiletime`,
     `cakeless-ioc`
   )
@@ -86,7 +87,7 @@ lazy val docs = project
 
 lazy val root = project
   .in(file("."))
-  .aggregate(cakeless, `cakeless-injector`, `cakeless-compiletime`, `cakeless-ioc`, examples, docs)
+  .aggregate(cakeless, `cakeless-kernel`, `cakeless-compiletime`, `cakeless-ioc`, examples, docs)
   .settings(
     name := "cakeless-new-root",
     skip in publish := true,

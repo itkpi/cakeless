@@ -1,6 +1,6 @@
 package cakeless.compiletime
 
-import cakeless.{wired, ConflictResolution}
+import cakeless.{wired, CollisionResolving}
 import scala.reflect.macros.{blackbox, TypecheckException}
 import cakeless.nat._
 
@@ -8,7 +8,7 @@ class CompileTimeInjector(override val c: blackbox.Context) extends DependencyRe
 
   import c.universe._
 
-  def mkConstructorImpl[R: WeakTypeTag, T >: R: WeakTypeTag, N <: Nat: WeakTypeTag, CR <: ConflictResolution: WeakTypeTag]: Tree = {
+  def mkConstructorImpl[R: WeakTypeTag, T: WeakTypeTag, N <: Nat: WeakTypeTag, CR <: CollisionResolving: WeakTypeTag]: Tree = {
     val R          = weakTypeOf[R].dealias
     val N          = weakTypeOf[N].dealias
     val T          = weakTypeOf[T].dealias
@@ -16,9 +16,9 @@ class CompileTimeInjector(override val c: blackbox.Context) extends DependencyRe
     val unrefinedT = unrefine(T).toSet.filterNot(_ =:= any)
 //    val depsExclusions = zenvMembers.collect { case (k, _) if unrefinedT.contains(k) => k }.toList
     val resolution = CR match {
-      case AutoResolution  => ConflictResolution.Auto
-      case RaiseResolution => ConflictResolution.Raise
-      case WarnResolution  => ConflictResolution.Warn
+      case AutoResolution  => CollisionResolving.Auto
+      case RaiseResolution => CollisionResolving.Raise
+      case WarnResolution  => CollisionResolving.Warn
     }
 
 //    unrefinedT.collectFirst {
@@ -57,20 +57,20 @@ class CompileTimeInjector(override val c: blackbox.Context) extends DependencyRe
       else q"""new $mainType with ..$refinementsWithExclusions { ..$assignmentsWithExclusions }"""
 
     val autoAssignments = resolution match {
-      case ConflictResolution.Auto => foundVals.map(_.assignment)
+      case CollisionResolving.Auto => foundVals.map(_.assignment)
       case _                       => Nil
     }
     val createExcluder = excludedTypes match {
       case Nil =>
         q"""
-          new _root_.cakeless.inject.EnvConstructor[$R, $N, $CR] {
+          new _root_.cakeless.kernel.EnvConstructor[$R, $N, $CR] {
             type Excluded = $any
             override def construct(r: Excluded): $R = $envCode
           }
          """
       case _ =>
         q"""
-           new _root_.cakeless.inject.EnvConstructor[$R, $N, $CR] {
+           new _root_.cakeless.kernel.EnvConstructor[$R, $N, $CR] {
             type Excluded = $T
             override def construct($standardDepName: Excluded): $R = $envCode
           }
@@ -99,7 +99,7 @@ class CompileTimeInjector(override val c: blackbox.Context) extends DependencyRe
   private def collectDependencies(
       dependencies: List[Dependency],
       exclusions: List[Type],
-      resolution: ConflictResolution
+      resolution: CollisionResolving
   ): (List[Tree], List[ValInfo]) = {
     debugged() {
       vals.mkString("\n")
@@ -150,7 +150,7 @@ class CompileTimeInjector(override val c: blackbox.Context) extends DependencyRe
     depsWithImpls.map(_._2) -> depsWithImpls.flatMap(_._3)
   }
 
-  private def selectDep(valInfo: ValInfo, dependency: Dependency, resolution: ConflictResolution): Tree = {
+  private def selectDep(valInfo: ValInfo, dependency: Dependency, resolution: CollisionResolving): Tree = {
     import dependency.{constructorInfo, prefixType, name => depName, tpe => depTpe}
     import valInfo.valDef
 
@@ -167,14 +167,14 @@ class CompileTimeInjector(override val c: blackbox.Context) extends DependencyRe
     }
 
     if (depName == valDef.name && constructorInfo.isEmpty) resolution match {
-      case ConflictResolution.Raise =>
+      case CollisionResolving.Raise =>
         fail(
           s"""
                |$baseMessage
                |If you are sure what you're doing, use `.warnConflicts` on your EnvInjector
                |""".stripMargin
         )
-      case ConflictResolution.Warn =>
+      case CollisionResolving.Warn =>
         warn(
           s"""
                |$baseMessage
@@ -183,7 +183,7 @@ class CompileTimeInjector(override val c: blackbox.Context) extends DependencyRe
         )
         q"${valDef.name}"
 
-      case ConflictResolution.Auto =>
+      case CollisionResolving.Auto =>
         q"${valInfo.freshName}"
     }
     else q"${valDef.name}"
@@ -203,9 +203,9 @@ class CompileTimeInjector(override val c: blackbox.Context) extends DependencyRe
   private val any             = typeOf[Any].dealias
   private val Zero            = typeOf[_0].dealias
   private val Inc             = typeOf[Nat.Inc[_0]].dealias
-  private val AutoResolution  = typeOf[ConflictResolution.Auto].dealias
-  private val RaiseResolution = typeOf[ConflictResolution.Raise].dealias
-  private val WarnResolution  = typeOf[ConflictResolution.Warn].dealias
+  private val AutoResolution  = typeOf[CollisionResolving.Auto].dealias
+  private val RaiseResolution = typeOf[CollisionResolving.Raise].dealias
+  private val WarnResolution  = typeOf[CollisionResolving.Warn].dealias
   private val WiredAnnotation = typeOf[wired].dealias
 
   private def constructor(N: Type): Int =

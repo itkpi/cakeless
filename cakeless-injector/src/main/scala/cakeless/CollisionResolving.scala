@@ -26,20 +26,22 @@ package cakeless
   *   }
   * }}}
   * */
-sealed trait ConflictResolution
-object ConflictResolution {
+sealed trait CollisionResolving
+object CollisionResolving {
 
   /** @note - Default strategy, will raise compile time error */
-  sealed trait Raise extends ConflictResolution
+  sealed trait Raise extends CollisionResolving
   case object Raise  extends Raise
 
   /** @note - will just generate a warning, not an error */
-  sealed trait Warn extends ConflictResolution
+  sealed trait Warn extends CollisionResolving
   case object Warn  extends Warn
 
   /**
     * @note - cakeless will resolve it for you ;)
     * */
-  sealed trait Auto extends ConflictResolution
+  sealed trait Auto extends CollisionResolving
   case object Auto  extends Auto
+
+  type Default = Auto
 }

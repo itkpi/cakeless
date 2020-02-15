@@ -5,14 +5,14 @@ import scala.annotation.implicitNotFound
 
 @implicitNotFound("""Type ${Z} is not like ZIO or ZManaged to support automatic wiring.
    Please provide your custom instance if you're sure.""")
-trait ZEnvLike[Z[-_, +_, +_]] {
+trait Injectable[Z[-_, +_, +_]] {
   def provideSomeM[R, E, A, R0, E1 >: E](z: Z[R, E, A])(r0: ZIO[R0, E1, R])(implicit ev: NeedsEnv[R]): Z[R0, E1, A]
   def liftEffect[R, E, A](zio: ZIO[R, E, A]): Z[R, E, A]
   def flatMap[R, E, A, R1 <: R, E1 >: E, B](z: Z[R, E, A])(f: A => Z[R1, E1, B]): Z[R1, E1, B]
 }
 
-object ZEnvLike {
-  implicit val zioInstance: ZEnvLike[ZIO] = new ZEnvLike[ZIO] {
+object Injectable {
+  implicit val zioInstance: Injectable[ZIO] = new Injectable[ZIO] {
     override def provideSomeM[R, E, A, R0, E1 >: E](z: ZIO[R, E, A])(r0: ZIO[R0, E1, R])(implicit ev: NeedsEnv[R]): ZIO[R0, E1, A] =
       z.provideSomeM(r0)
 
@@ -22,7 +22,7 @@ object ZEnvLike {
       z.flatMap(f)
   }
 
-  implicit val zmanagedInstance: ZEnvLike[ZManaged] = new ZEnvLike[ZManaged] {
+  implicit val zmanagedInstance: Injectable[ZManaged] = new Injectable[ZManaged] {
     override def provideSomeM[R, E, A, R0, E1 >: E](
         z: ZManaged[R, E, A]
     )(r0: ZIO[R0, E1, R])(implicit ev: NeedsEnv[R]): ZManaged[R0, E1, A] =
