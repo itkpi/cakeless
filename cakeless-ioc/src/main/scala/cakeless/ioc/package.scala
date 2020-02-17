@@ -1,5 +1,6 @@
 package cakeless
 
+import cakeless.ioc.builder.{ExecutableBuilder0, ModuleBuilder0}
 import cakeless.nat._
 import zio._
 
@@ -9,10 +10,13 @@ package object ioc {
   type URModule[-R, +A] = ZModule[R, Nothing, A]
   type RModule[+A]      = ZModule[Any, Throwable, A]
 
-  case object Main extends ZModuleDecl[ZEnv, Nothing, Unit]
-
   def of[M <: ZModuleDecl[_, _, _]](decl: M): ModuleBuilder0[decl.R, decl.E, decl.Wired] =
     new ModuleBuilder0[decl.R, decl.E, decl.Wired](decl.asInstanceOf[ZModule[decl.R, decl.E, decl.Wired]])
+
+  def ofExecutable[M <: ZExecutableDecl[_, _, _]](decl: M): ExecutableBuilder0[decl.R, decl.E, decl.Wired] =
+    new ExecutableBuilder0[decl.R, decl.E, decl.Wired](decl.asInstanceOf[ZExecutableDecl[decl.R, decl.E, decl.Wired]])
+
+  final val Main = new ZExecutableDecl[zio.ZEnv, Nothing, Int] {}
 
   implicit class ZioInject[Z[-_, +_, +_], R, E, A](private val self: Z[R, E, A]) extends AnyVal {
 

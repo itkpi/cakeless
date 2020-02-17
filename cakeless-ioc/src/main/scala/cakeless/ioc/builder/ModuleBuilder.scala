@@ -1,5 +1,6 @@
-package cakeless.ioc
+package cakeless.ioc.builder
 
+import cakeless.ioc.ZModule
 import zio.{ZIO, ZManaged}
 import scala.annotation.unchecked.uncheckedVariance
 
@@ -31,8 +32,8 @@ class ModuleBuilder0[-R, +E, +A] private[cakeless] (val `decl`: ZModule[R, E, A]
   def apply[R0 <: R, E1 >: E, A1 >: A](effect: ZIO[R0, E1, A1]): ModuleBuilder[R0, E1, A1] =
     apply(ZManaged.fromEffect(effect))
 
-  def apply[A1 >: A](value: A1): ModuleBuilder[R, E, A1] =
-    apply(ZManaged.succeed(value))
+  def apply[A1 >: A](value: => A1): ModuleBuilder[R, E, A1] =
+    apply(ZManaged.effectTotal(value))
 }
 
 class ModuleBuilder1[-R0, -R, +E, +A] private[cakeless] (

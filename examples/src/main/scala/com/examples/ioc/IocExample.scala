@@ -5,7 +5,7 @@ import zio.console.putStrLn
 
 object IocExample
     extends ApplicationDefn(
-      of(Main) {
+      ofExecutable(Main) {
         putStrLn("Hello, cakeless!")
-      }
+      }.ignoreArgs.run(_ => 0)
     )
