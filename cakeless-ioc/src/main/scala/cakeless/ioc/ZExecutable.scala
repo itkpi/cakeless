@@ -1,6 +1,6 @@
 package cakeless.ioc
 
-import cakeless.ioc.builder.{ExecutableBuilder, MainApplicationBuilder}
+import cakeless.ioc.builder.{ZExecutableBuilder, ZMainBuilder, ZUsage}
 import zio._
 
 sealed trait ZExecutable[-Rx, +Ex, +Ax] extends ZModuleDecl[Rx, Ex, Ax] {}
@@ -16,16 +16,21 @@ sealed trait ZExecutableAsManaged[-Rx, +Ex, +Ax] extends ZExecutableDecl[Rx, Ex,
   def asManaged: ZManaged[Rx, Ex, Ax]
 }
 
-class ExecutableDefn[-Rx, +Ex, +Ax](builder: ExecutableBuilder[Rx, Ex, Ax]) extends ZExecutableAsManaged[Rx, Ex, Ax] {
-  final override def asManaged: ZManaged[Rx, Ex, Ax] = builder.`env`
+class ExecutableDefn[-Rx, +Ex, +Ax](builder: ZExecutableBuilder[Rx, Ex, Ax, ZUsage.NoUsage]) extends ZExecutableAsManaged[Rx, Ex, Ax] {
+  final override def asManaged: ZManaged[Rx, Ex, Ax] = builder.getManaged
 
-  def execute: ZIO[Rx, Ex, Int] = builder.`use`(asManaged)
+  def execute: ZIO[Rx, Ex, Ax] = builder.getUsage[Rx, Ex, Ax].use(Nil)(asManaged)
 }
 
-class ApplicationDefn[+Ax](builder: MainApplicationBuilder[ZEnv, Nothing, Ax]) extends ZExecutableAsManaged[ZEnv, Nothing, Ax] with App {
+class ApplicationDefn[+Ex, +Ax](builder: ZMainBuilder[Ex, Ax, ZUsage.Base]) extends ZExecutableAsManaged[ZEnv, Ex, Ax] with App {
 
-  final override def asManaged: ZManaged[zio.ZEnv, Nothing, Ax] = builder.`env`
+  final override def asManaged: ZManaged[zio.ZEnv, Ex, Ax] = builder.getManaged
 
   final override def run(args: List[String]): ZIO[ZEnv, Nothing, Int] =
-    builder.`use`(args, asManaged)
+    builder.getUsage
+      .use(args)(asManaged)
+      .foldM(
+        builder.failure,
+        builder.success
+      )
 }

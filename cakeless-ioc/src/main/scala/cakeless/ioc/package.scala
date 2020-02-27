@@ -1,6 +1,6 @@
 package cakeless
 
-import cakeless.ioc.builder.{ExecutableBuilder0, ModuleBuilder0}
+import cakeless.ioc.builder.{ModuleBuilder0, ZExecutableBuilder0, ZExecutableBuilderInitial}
 import cakeless.nat._
 import zio._
 
@@ -13,10 +13,19 @@ package object ioc {
   def of[M <: ZModuleDecl[_, _, _]](decl: M): ModuleBuilder0[decl.R, decl.E, decl.Wired] =
     new ModuleBuilder0[decl.R, decl.E, decl.Wired](decl.asInstanceOf[ZModule[decl.R, decl.E, decl.Wired]])
 
-  def ofExecutable[M <: ZExecutableDecl[_, _, _]](decl: M): ExecutableBuilder0[decl.R, decl.E, decl.Wired] =
-    new ExecutableBuilder0[decl.R, decl.E, decl.Wired](decl.asInstanceOf[ZExecutableDecl[decl.R, decl.E, decl.Wired]])
+  def ofExecutable[M <: ZExecutableDecl[_, _, _]](decl: M): ZExecutableBuilderInitial[decl.R, decl.E, decl.Wired] =
+    new ZExecutableBuilderInitial[decl.R, decl.E, decl.Wired](decl.asInstanceOf[ZExecutableDecl[decl.R, decl.E, decl.Wired]])
 
-  final val Main = new ZExecutableDecl[zio.ZEnv, Nothing, Int] {}
+  def Main[A]: Main[A] = new ZExecutableDecl[zio.ZEnv, Throwable, A] {
+    override type R     = zio.ZEnv
+    override type E     = Throwable
+    override type Wired = A
+  }
+  type Main[+A] = ZExecutableDecl[zio.ZEnv, Throwable, A] {
+    type R = zio.ZEnv
+    type E = Throwable
+    type Wired <: A
+  }
 
   implicit class ZioInject[Z[-_, +_, +_], R, E, A](private val self: Z[R, E, A]) extends AnyVal {
 
